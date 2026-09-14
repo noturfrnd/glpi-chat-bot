@@ -2,7 +2,12 @@ import argparse
 import json
 from typing import Any, Dict
 
-from glpi_client import GLPIClient, pretty_print
+try:
+    from domain_service import DomainService
+    from glpi_client import GLPIClient, pretty_print
+except ModuleNotFoundError:  # pragma: no cover - execução direta via python src/main.py
+    from src.domain_service import DomainService
+    from src.glpi_client import GLPIClient, pretty_print
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -18,15 +23,35 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run_demo(client: GLPIClient, write_demo: bool = False) -> None:
+    service = DomainService()
+
     print("Obtendo token OAuth2...")
     token_response = client.get_token()
+    service.update_from_api_response("account", token_response)
     print(json.dumps(token_response, indent=2, ensure_ascii=False))
 
-    pretty_print("Usuário autenticado", client.me())
-    pretty_print("Lista de chamados", client.ticket_list(start=0, limit=5))
-    pretty_print("Artigos da base de conhecimento", client.knowledgebase_articles(start=0, limit=5))
-    pretty_print("Categorias de chamado", client.itil_categories(start=0, limit=5))
-    pretty_print("Usuários", client.users(start=0, limit=5))
+    me_response = client.me()
+    service.update_from_api_response("users", me_response)
+    pretty_print("Usuário autenticado", me_response)
+
+    tickets_response = client.ticket_list(start=0, limit=5)
+    service.update_from_api_response("tickets", tickets_response)
+    pretty_print("Lista de chamados", tickets_response)
+
+    articles_response = client.knowledgebase_articles(start=0, limit=5)
+    service.update_from_api_response("articles", articles_response)
+    pretty_print("Artigos da base de conhecimento", articles_response)
+
+    categories_response = client.itil_categories(start=0, limit=5)
+    service.update_from_api_response("categories", categories_response)
+    pretty_print("Categorias de chamado", categories_response)
+
+    users_response = client.users(start=0, limit=5)
+    service.update_from_api_response("users", users_response)
+    pretty_print("Usuários", users_response)
+
+    print("\nCache salvo em data/glpi_cache.json")
+    print(json.dumps(service.store.data, ensure_ascii=False, indent=2)[:800])
 
     if write_demo:
         ticket_result = client.create_ticket(
