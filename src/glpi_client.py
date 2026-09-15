@@ -79,11 +79,28 @@ class GLPIClient:
             self.access_token = data.get("access_token")
             self.refresh_token = data.get("refresh_token")
         return data
-
+    
     def request(self, method: str, path: str, *, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         if not self.access_token:
             self.get_token()
 
+        response = self._send(method, path, params=params, json_body=json_body)
+
+        if response.status_code == 401:
+            if self.refresh_token:
+                self.refresh_token_request()
+            else:
+                self.get_token()
+            response = self._send(method, path, params=params, json_body=json_body)
+
+        return {
+            "status_code": response.status_code,
+            "url": f"{self.base_url}{path}",
+            "params": params,
+            "data": self._parse_response(response),
+        }
+
+    def _send(self, method: str, path: str, *, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None) -> requests.Response:
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Accept": "application/json",
@@ -91,22 +108,14 @@ class GLPIClient:
         if json_body is not None:
             headers["Content-Type"] = "application/json"
 
-        url = f"{self.base_url}{path}"
-
-        response = requests.request(
+        return requests.request(
             method=method.upper(),
-            url=url,
+            url=f"{self.base_url}{path}",
             headers=headers,
             params=params,
             json=json_body,
             timeout=30,
         )
-        return {
-            "status_code": response.status_code,
-            "url": url,
-            "params": params,
-            "data": self._parse_response(response),
-        }
 
     @staticmethod
     def _parse_response(response: requests.Response) -> Any:
