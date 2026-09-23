@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 from dotenv import load_dotenv
@@ -148,6 +148,34 @@ class GLPIClient:
             "/api.php/v2/Knowledgebase/Article",
             params={"start": start, "limit": limit},
         )
+
+    def get_all_articles(self, page_size: int = 50) -> List[Dict[str, Any]]:
+        """Busca todos os artigos da base de conhecimento usando paginação."""
+        articles: List[Dict[str, Any]] = []
+        start = 0
+
+        while True:
+            response = self.knowledgebase_articles(
+                start=start,
+                limit=page_size,
+            )
+
+            page = response.get("data")
+
+            if not isinstance(page, list):
+                raise ValueError("Resposta inesperada ao buscar artigos do GLPI.")
+
+            articles.extend(page)
+
+            if response.get("status_code") == 200:
+                break
+
+            if not page:
+                break
+
+            start += len(page)
+
+        return articles
 
     def itil_categories(self, start: int = 0, limit: int = 5) -> Dict[str, Any]:
         return self.request(
