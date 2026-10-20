@@ -16,9 +16,19 @@ Pra começar a trabalhar com o codigo, voce deve seguir um breve passo a passo q
 
   - Para mudar de branch basta clicar no nome, vai abrir no topo do vsCode uma lista de branchs, onde voce deve escoher "main" ![alt text](image-7.png) ao clicar em main, toda a mudança sera feita automaticamente
 
-  - agora voce precisa atualizar as mudanças que estão na main da nuvem para o seu codigo local
+  - agora voce precisa atualizar as mudanças que estão na main da nuvem para o seu codigo local usando o botão "Pull" na terceira aba do vsCode "source control" ![alt text](image-8.png) ( segunda seta pra baixo, selecionado na imagem)
 
-    -
+  - apos isso, sua branch main tera todas as mudanças atualizadas, agora voce deve criar uma branch para que voce mesmo faça as suas mudanças, pra isso, basta clicar novamente no nome da branch no canto inferior direito e ao aparecer o pop-up no todo do vsCode selecionar a opção "create new branch from"![alt text](image-9.png) e então selecionar a primeira opção "HEAD" ![alt text](image-10.png) e digitar o nome da sua nova branch ![alt text](image-11.png) depois basta apertar enter e sua branch nova esta criada
+
+  - mas esta branch ainda nao esta na nuvem, entao no canto inferior esquerdo clique na nuvem ao lado do nome da branch ![alt text](image-12.png)
+
+  - Agora, quando finalizar suas alterações voltamos a terceira aba lateral do vsCode, a "source control", e vemos as mudanças que ainda nao foram adicionadas a nuvem ![alt text](image-13.png)
+
+    - para adicionar essas mudanças é necessario fazer um "commit", para isso escreva a mensagem do commit logo acima dessas mudanças, e ao passa o mouse em cima do nome "changes" vera um sinal de +, clique nele pra adicionar as mudanças ao commit ![alt text](image-14.png)
+
+    - depois basta clicar no botao azul escrito "commit"
+
+    - e no mesmo lugar que fizemos o "pull" agora precisa fazer o "push" representado pela seta pra cima ![alt text](image-15.png)
 
 
 ### no terminal
