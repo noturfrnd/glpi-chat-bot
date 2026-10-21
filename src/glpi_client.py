@@ -127,6 +127,59 @@ class GLPIClient:
             params={"start": start, "limit": limit},
         )
 
+    def tickets_by_user(
+            self,
+            user_id: int,
+            limit: int = 100
+    ) -> Dict[str, Any]:
+
+        if user_id <= 0:
+            raise ValueError("O ID do usuário deve ser positivo.")
+
+        if limit <= 0:
+            raise ValueError("O limite deve ser positivo.")
+
+        tickets_usuario = []
+        start = 0
+
+        while True:
+            response = self.ticket_list(start=start, limit=limit)
+
+            status = response["status_code"]
+
+            if not 200 <= status < 300:
+                return {
+                    "status_code": status,
+                    "data": response["data"],
+                }
+
+            tickets = response["data"]
+
+            if not isinstance(tickets, list):
+                raise ValueError("Resposta inesperada da API GLPI.")
+
+            for ticket in tickets:
+                team = ticket.get("team") or []
+
+                if any(
+                    member.get("id") == user_id
+                    and member.get("role") == "requester"
+                    for member in team
+                ):
+                    tickets_usuario.append(ticket)
+
+            if status == 200 or len(tickets) < limit or not tickets:
+                break
+
+            start += limit
+
+        return {
+            "status_code": 200,
+            "user_id": user_id,
+            "total": len(tickets_usuario),
+            "data": tickets_usuario,
+        }
+
     def ticket_detail(self, ticket_id: int) -> Dict[str, Any]:
         return self.request("GET", f"/api.php/v2/Assistance/Ticket/{ticket_id}")
 
