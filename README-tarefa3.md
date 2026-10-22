@@ -6,6 +6,9 @@ Esta cópia está na branch `feat/tarefa3-processamento-perguntas`, baseada na
 atualização `cd2572a` da `main` e na contribuição anterior de busca de artigos.
 O código e as evidências de validação estão preparados nessa branch para revisão.
 
+A [documentação para o relatório final](docs/Documentacao-Tarefa3-GLPI.md)
+reúne o escopo da contribuição, o funcionamento da API, os testes e as limitações.
+
 **Sem acesso ao GLPI no momento?** Use a collection de simulação e o
 [roteiro local](postman/README-simulacao.md). Essa opção usa artigos fictícios
 para testar a entrada e a extração de palavras-chave sem iniciar o GLPI.
