@@ -59,4 +59,3 @@ def validar_resposta(texto, fontes):
     if resultado['status'] == 'sem_base' and ids:
         raise ValueError('Abstenção deve ter fontes vazias.')
     return resultado
-

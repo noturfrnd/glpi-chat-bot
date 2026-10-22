@@ -124,4 +124,3 @@ class Busca:
         # Retém candidatos próximos do melhor, sem preencher vagas à força.
         corte = ordenados[0]['pontuacao'] * 0.65
         return [r for r in ordenados if r['pontuacao'] >= corte][:limite]
-
