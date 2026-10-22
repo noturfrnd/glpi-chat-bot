@@ -6,6 +6,11 @@ Esta cópia está na branch `feat/tarefa3-processamento-perguntas`, baseada na
 atualização `cd2572a` da `main` e na contribuição anterior de busca de artigos.
 O desenvolvimento está local; a branch ainda não foi publicada no GitHub.
 
+**Sem acesso ao GLPI no momento?** Use a collection de simulação e o
+[roteiro local](postman/README-simulacao.md). Essa opção usa artigos fictícios
+para testar a entrada e a extração de palavras-chave. O retorno da API real
+continua pendente até o ambiente do grupo estar disponível.
+
 ## O que foi implementado
 
 - Validação de `message`: texto não vazio, com até 4.000 caracteres.

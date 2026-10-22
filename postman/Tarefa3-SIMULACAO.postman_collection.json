@@ -1,0 +1,377 @@
+{
+  "info": {
+    "name": "SIMULAÇÃO LOCAL — Tarefa 3 — sem GLPI real",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Usa artigos FICTÍCIOS e token de teste público. Não comprova integração com GLPI real. Inicie tests.postman_demo na porta 8001. Não use Create Token nem credenciais reais nesta collection."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8001",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "somente-simulacao-tarefa3",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Busca natural",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+              "if (pm.response.code === 200) {",
+              "    const body = pm.response.json();",
+              "    pm.test(\"Pergunta e palavras-chave presentes\", function () {",
+              "        pm.expect(typeof body.pergunta === \"string\").to.equal(true);",
+              "        pm.expect(Array.isArray(body.palavras_chave) &&",
+              "            body.palavras_chave.every(k => typeof k === \"string\")).to.equal(true);",
+              "        pm.expect(new Set(body.palavras_chave).size === body.palavras_chave.length).to.equal(true);",
+              "    });",
+              "    pm.test(\"Artigos e total consistentes\", function () {",
+              "        pm.expect(Array.isArray(body.artigos)).to.equal(true);",
+              "        pm.expect(Number.isInteger(body.total) && body.total === body.artigos.length &&",
+              "            body.total >= 0 && body.total <= 3).to.equal(true);",
+              "        pm.expect(body.artigos.every(a => Number.isInteger(a.id) &&",
+              "            typeof a.titulo === \"string\" && typeof a.conteudo === \"string\" &&",
+              "            typeof a.pontuacao === \"number\" && typeof a.fonte_api === \"string\" &&",
+              "            Array.isArray(a.termos_encontrados))).to.equal(true);",
+              "    });",
+              "}",
+              "if (pm.response.code === 200) {",
+              "    pm.test(\"Palavras-chave esperadas\", function () {",
+              "        const words = pm.response.json().palavras_chave;",
+              "        pm.expect([\"vpn\", \"windows\"].every(k => words.includes(k))).to.equal(true);",
+              "        pm.expect(!words.includes(\"oi\") && !words.includes(\"tentando\")).to.equal(true);",
+              "    });",
+              "}",
+              "pm.test(\"Servidor explicitamente simulado\", function () {",
+              "    pm.expect(pm.response.headers.get(\"X-GLPI-Simulation\")).to.equal(\"true\");",
+              "});",
+              "pm.test(\"Resultado esperado da base fictícia\", function () {",
+              "    pm.expect(JSON.stringify(pm.response.json().artigos.map(a => a.id))).to.equal(\"[9001]\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Oi, bom dia, estou tentando configurar a VPN no Windows e preciso de ajuda\",\n  \"history\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "chat"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Busca com e-mail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+              "if (pm.response.code === 200) {",
+              "    const body = pm.response.json();",
+              "    pm.test(\"Pergunta e palavras-chave presentes\", function () {",
+              "        pm.expect(typeof body.pergunta === \"string\").to.equal(true);",
+              "        pm.expect(Array.isArray(body.palavras_chave) &&",
+              "            body.palavras_chave.every(k => typeof k === \"string\")).to.equal(true);",
+              "        pm.expect(new Set(body.palavras_chave).size === body.palavras_chave.length).to.equal(true);",
+              "    });",
+              "    pm.test(\"Artigos e total consistentes\", function () {",
+              "        pm.expect(Array.isArray(body.artigos)).to.equal(true);",
+              "        pm.expect(Number.isInteger(body.total) && body.total === body.artigos.length &&",
+              "            body.total >= 0 && body.total <= 3).to.equal(true);",
+              "        pm.expect(body.artigos.every(a => Number.isInteger(a.id) &&",
+              "            typeof a.titulo === \"string\" && typeof a.conteudo === \"string\" &&",
+              "            typeof a.pontuacao === \"number\" && typeof a.fonte_api === \"string\" &&",
+              "            Array.isArray(a.termos_encontrados))).to.equal(true);",
+              "    });",
+              "}",
+              "if (pm.response.code === 200) {",
+              "    pm.test(\"Palavras-chave esperadas\", function () {",
+              "        const words = pm.response.json().palavras_chave;",
+              "        pm.expect([\"assinatura\", \"email\"].every(k => words.includes(k))).to.equal(true);",
+              "        pm.expect(!words.includes(\"oi\") && !words.includes(\"tentando\")).to.equal(true);",
+              "    });",
+              "}",
+              "pm.test(\"Servidor explicitamente simulado\", function () {",
+              "    pm.expect(pm.response.headers.get(\"X-GLPI-Simulation\")).to.equal(\"true\");",
+              "});",
+              "pm.test(\"Resultado esperado da base fictícia\", function () {",
+              "    pm.expect(JSON.stringify(pm.response.json().artigos.map(a => a.id))).to.equal(\"[9003]\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Como configurar assinatura de e-mail?\",\n  \"history\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "chat"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Assunto inexistente na base simulada — zero artigos",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+              "if (pm.response.code === 200) {",
+              "    const body = pm.response.json();",
+              "    pm.test(\"Pergunta e palavras-chave presentes\", function () {",
+              "        pm.expect(typeof body.pergunta === \"string\").to.equal(true);",
+              "        pm.expect(Array.isArray(body.palavras_chave) &&",
+              "            body.palavras_chave.every(k => typeof k === \"string\")).to.equal(true);",
+              "        pm.expect(new Set(body.palavras_chave).size === body.palavras_chave.length).to.equal(true);",
+              "    });",
+              "    pm.test(\"Artigos e total consistentes\", function () {",
+              "        pm.expect(Array.isArray(body.artigos)).to.equal(true);",
+              "        pm.expect(Number.isInteger(body.total) && body.total === body.artigos.length &&",
+              "            body.total >= 0 && body.total <= 3).to.equal(true);",
+              "        pm.expect(body.artigos.every(a => Number.isInteger(a.id) &&",
+              "            typeof a.titulo === \"string\" && typeof a.conteudo === \"string\" &&",
+              "            typeof a.pontuacao === \"number\" && typeof a.fonte_api === \"string\" &&",
+              "            Array.isArray(a.termos_encontrados))).to.equal(true);",
+              "    });",
+              "}",
+              "pm.test(\"Servidor explicitamente simulado\", function () {",
+              "    pm.expect(pm.response.headers.get(\"X-GLPI-Simulation\")).to.equal(\"true\");",
+              "});",
+              "pm.test(\"Resultado esperado da base fictícia\", function () {",
+              "    pm.expect(JSON.stringify(pm.response.json().artigos.map(a => a.id))).to.equal(\"[]\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Como configurar telescópio no Windows?\",\n  \"history\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "chat"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Mensagem vazia — 422",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", function () { pm.response.to.have.status(422); });",
+              "pm.test(\"Erro explicado\", function () {",
+              "    pm.expect(Object.prototype.hasOwnProperty.call(pm.response.json(), \"detail\")).to.equal(true);",
+              "});",
+              "pm.test(\"Servidor explicitamente simulado\", function () {",
+              "    pm.expect(pm.response.headers.get(\"X-GLPI-Simulation\")).to.equal(\"true\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"   \",\n  \"history\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "chat"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Sem Bearer — 401",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+              "pm.test(\"Erro explicado\", function () {",
+              "    pm.expect(Object.prototype.hasOwnProperty.call(pm.response.json(), \"detail\")).to.equal(true);",
+              "});",
+              "pm.test(\"Servidor explicitamente simulado\", function () {",
+              "    pm.expect(pm.response.headers.get(\"X-GLPI-Simulation\")).to.equal(\"true\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Como configurar VPN no Windows?\",\n  \"history\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/chat",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "chat"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
