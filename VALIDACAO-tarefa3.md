@@ -58,6 +58,18 @@ O roteiro adicional fez **55 verificações**, incluindo as comparações dos ar
 com o GLPI e o tratamento das entradas. Todas passaram. Esses números se referem
 à integração executada nesta data; não são a contagem da suíte de testes unitários.
 
+## Validação manual no Postman
+
+Depois da execução automatizada, o usuário repetiu os testes na interface do
+Postman em 22/10/2026. A captura de **Busca natural** confirmou **200 OK**,
+**4/4 verificações aprovadas**, as palavras-chave e o artigo **ID 1**,
+**Configurar a VPN corporativa no Windows**.
+
+O usuário informou a conclusão dos outros quatro cenários da tarefa 3 após
+receber o roteiro com os resultados esperados. A captura conferida diretamente
+corresponde à busca natural; os resultados individuais dos demais cenários
+estão documentados pela execução automatizada acima.
+
 ## Comportamento adicional observado
 
 O GLPI deste laboratório respondeu **400** ao receber um token malformado; uma
@@ -73,6 +85,6 @@ Use as instruções de [README-tarefa3.md](README-tarefa3.md) para iniciar o bac
 e executar a collection contra o laboratório. Confirme os artigos acessíveis ao
 usuário utilizado, pois outra base ou outro perfil pode produzir resultados distintos.
 
-A branch permanece local. Esta validação não publicou commits, abriu Pull Request
-nem alterou a `main`. O material está pronto para revisão e publicação da branch.
+O material está pronto para revisão na branch `feat/tarefa3-processamento-perguntas`.
+A validação não altera a `main`; a integração da contribuição depende da revisão.
 Credenciais e tokens não fazem parte deste relatório nem da collection versionada.

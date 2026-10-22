@@ -4,7 +4,7 @@ A tarefa recebe o texto de uma pergunta, identifica palavras-chave e retorna at�
 
 Esta cópia está na branch `feat/tarefa3-processamento-perguntas`, baseada na
 atualização `cd2572a` da `main` e na contribuição anterior de busca de artigos.
-O desenvolvimento está local; a branch ainda não foi publicada no GitHub.
+O código e as evidências de validação estão preparados nessa branch para revisão.
 
 **Sem acesso ao GLPI no momento?** Use a collection de simulação e o
 [roteiro local](postman/README-simulacao.md). Essa opção usa artigos fictícios
@@ -134,7 +134,9 @@ com os dados fictícios do laboratório.
 
 O Newman executou **Create Token** e os cinco pedidos da tarefa 3 da collection
 real, com **16 de 16 verificações aprovadas**. Essa execução foi automatizada
-pelo Newman; a interface gráfica do Postman não foi usada para a validação real.
+pelo Newman. Depois, o usuário repetiu os testes na interface do Postman;
+a captura de **Busca natural** confirmou **200 OK**, **4/4 verificações** e
+o artigo ID 1. O usuário informou a conclusão dos outros quatro cenários.
 
 | Cenário | Resultado observado |
 | --- | --- |
@@ -153,7 +155,7 @@ remoção de HTML aplicada pelo backend.
 Essas evidências cobrem o recebimento da pergunta, a extração de palavras-chave
 e o retorno de artigos correspondentes da API do GLPI no laboratório.
 Consulte o [registro de validação](VALIDACAO-tarefa3.md) para os detalhes.
-A branch continua local e ainda não foi publicada no GitHub.
+O código está preparado para revisão na branch `feat/tarefa3-processamento-perguntas`.
 
 Os testes locais automatizados continuam usando dados e respostas simuladas
 para verificar isoladamente o comportamento do código.
