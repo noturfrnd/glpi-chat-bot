@@ -8,8 +8,9 @@ O desenvolvimento está local; a branch ainda não foi publicada no GitHub.
 
 **Sem acesso ao GLPI no momento?** Use a collection de simulação e o
 [roteiro local](postman/README-simulacao.md). Essa opção usa artigos fictícios
-para testar a entrada e a extração de palavras-chave. O retorno da API real
-continua pendente até o ambiente do grupo estar disponível.
+para testar a entrada e a extração de palavras-chave sem iniciar o GLPI.
+A integração com a aplicação GLPI do laboratório foi validada em 22/10/2026;
+veja o [registro de validação](VALIDACAO-tarefa3.md).
 
 ## O que foi implementado
 
@@ -23,23 +24,36 @@ Nenhum modelo de IA é chamado. `history` é aceito e validado, mas não partici
 
 ## Abrir e iniciar o projeto
 
+O ambiente do grupo usa o GLPI local do repositório `glpi-agent-lab`.
+Abra o Docker Desktop e aguarde o serviço iniciar. Em uma janela do PowerShell,
+inicie o laboratório já baixado:
+
+```powershell
+Set-Location -LiteralPath 'C:\Users\55799\Documents\glpi-agent-lab-main\lab'
+docker compose up -d --build
+```
+
+O arquivo `.env` desse laboratório já existe. Quando os contêineres estiverem
+prontos, a tela de login do GLPI deve abrir em `http://localhost:8080`.
+Esse ambiente executa a aplicação GLPI real com dados fictícios de treinamento.
+
 Abra esta pasta no VS Code ou no terminal:
 
 ```text
 C:\Users\55799\Documents\Codex\2026-10-20\v\work\glpi-chat-bot
 ```
 
-No PowerShell, entre nela e configure o endereço real do GLPI informado pelo grupo. `GLPI_BASE_URL` aponta para o servidor GLPI; `base_url`, usado no Postman, aponta para esta API local.
+Em outra janela do PowerShell, entre nela e configure o endereço do laboratório. `GLPI_BASE_URL` aponta para o servidor GLPI na porta 8080; `base_url`, usado no Postman, aponta para esta API local na porta 8000. A porta 8001 pertence à simulação separada.
 
 ```powershell
 Set-Location -LiteralPath 'C:\Users\55799\Documents\Codex\2026-10-20\v\work\glpi-chat-bot'
-$env:GLPI_BASE_URL = 'https://endereco-do-glpi-do-grupo'
+$env:GLPI_BASE_URL = 'http://localhost:8080'
 $env:APP_ENV = 'production'
 $env:DEV_BYPASS_API_VALIDATION = 'false'
 & 'C:\Users\55799\Documents\Codex\2026-10-20\v\work\venv-glpi\Scripts\python.exe' -B -m uvicorn src.main:app --host 127.0.0.1 --port 8000
 ```
 
-Substitua o endereço de exemplo antes de executar. Mantenha esse terminal aberto. A documentação interativa ficará em `http://127.0.0.1:8000/docs`.
+Mantenha esse terminal aberto e o Docker Desktop em execução. A documentação interativa ficará em `http://127.0.0.1:8000/docs`.
 
 O ambiente virtual citado acima foi preparado para esta cópia local. Em outro computador, crie o ambiente virtual e instale `requirements.txt` antes de iniciar o servidor.
 
@@ -66,7 +80,7 @@ Envie JSON com o cabeçalho `Content-Type: application/json` e autenticação `A
 }
 ```
 
-A resposta 200 tem esta estrutura. O exemplo vazio ilustra o contrato; não antecipa o resultado da base real:
+A resposta 200 tem esta estrutura. O exemplo vazio abaixo apenas ilustra o contrato; a busca de VPN retornou um artigo no laboratório, conforme o registro de validação:
 
 ```json
 {
@@ -89,7 +103,7 @@ Cada item de `artigos`, quando houver resultado, contém `id`, `titulo`, `conteu
 
 Os scripts da collection conferem status HTTP, estrutura dos campos, palavras-chave e consistência de `total`. Eles não exigem que exista um artigo de VPN ou de e-mail no servidor real.
 
-A requisição **Assunto fora da base — confirmar no GLPI** usa um tema candidato a não existir. Antes de usar o resultado como evidência de ausência, confira a base acessível ao usuário e ajuste a pergunta. O script valida o contrato, mas não exige `total = 0`, pois desconhecemos o conteúdo do servidor do grupo. Para esse cenário manual, o esperado é lista vazia somente após confirmar que a pergunta realmente está fora da base.
+A requisição **Assunto fora da base — confirmar no GLPI** usa um tema candidato a não existir. Antes de usar o resultado como evidência de ausência em outra base, confira os artigos acessíveis ao usuário e ajuste a pergunta. O script valida o contrato, mas não exige `total = 0`, para permitir uso em bases diferentes. No laboratório validado em 22/10/2026, a pergunta sobre telescópio retornou `artigos: []` e `total: 0`.
 
 Execute também **Mensagem vazia — 422** e **Sem Bearer — 401**. O primeiro usa autenticação e envia `message` vazio; o segundo envia uma mensagem válida sem autenticação. Os scripts esperam os respectivos códigos e um campo `detail` explicando a falha.
 
@@ -97,20 +111,52 @@ Execute também **Mensagem vazia — 422** e **Sem Bearer — 401**. O primeiro 
 
 | Código | Significado nesta integração |
 | --- | --- |
-| 401 | Bearer ausente ou autenticação rejeitada pelo GLPI. |
+| 401 | Bearer ausente ou resposta 401 do GLPI. |
 | 403 | O GLPI negou acesso aos artigos. |
 | 422 | Entrada inválida, como pergunta vazia ou longa demais. |
 | 429 | O GLPI limitou as chamadas. |
-| 502 | Falha de comunicação, resposta incompatível ou limite de paginação excedido. |
+| 502 | Falha de comunicação, resposta incompatível, limite de paginação excedido ou erro HTTP do GLPI não preservado pela rota. |
 | 504 | A consulta ao GLPI excedeu o tempo de espera. |
 
 A implementação limita a consulta a 20 páginas de até 50 artigos. Se atingir o limite sem terminar a paginação, retorna erro em vez de apresentar uma base parcial como completa.
 
+Na verificação adicional do laboratório, tokens malformados ou com assinatura
+inválida receberam HTTP 400 do GLPI. A regra atual de `/api/chat` converte esse
+400 em 502; portanto, nem todo token inválido resulta em 401. Bearer ausente
+retornou 401, como esperado pelo teste da collection.
+
 ## Situação da validação
 
-Os testes locais automatizados usam dados e respostas simuladas para verificar o comportamento do código. **A validação com o GLPI real do grupo e a execução da collection nesse ambiente ainda estão pendentes.** Em 22/10/2026, o endereço configurado `localhost:8080` recusou a conexão. Inicie o laboratório GLPI ou configure o endereço fornecido pelo grupo antes de executar a collection.
+**A integração com o GLPI do laboratório foi validada em 22/10/2026.**
+O GLPI em `http://localhost:8080` disponibilizou 40 artigos, consultados pelo
+backend `src.main:app` na porta 8000. Esses testes usaram a aplicação GLPI real
+com os dados fictícios do laboratório.
 
-Para concluir a tarefa, execute os critérios acima com credenciais autorizadas e registre os resultados sem incluir senhas ou tokens.
+O Newman executou **Create Token** e os cinco pedidos da tarefa 3 da collection
+real, com **16 de 16 verificações aprovadas**. Essa execução foi automatizada
+pelo Newman; a interface gráfica do Postman não foi usada para a validação real.
+
+| Cenário | Resultado observado |
+| --- | --- |
+| Busca natural sobre VPN no Windows | 200; artigo ID 1, **Configurar a VPN corporativa no Windows**. |
+| Busca com e-mail | 200; artigo ID 22, **Configurar assinatura padrão de e-mail**. |
+| Assunto fora da base: telescópio | 200; `artigos: []`, `total: 0`. |
+| Mensagem vazia | 422. |
+| Sem Bearer | 401. |
+
+Uma verificação de integração adicional comparou IDs, títulos e conteúdo dos
+resultados com respostas obtidas diretamente do GLPI usando o mesmo token.
+Também confirmou a busca de VPN no macOS com o artigo ID 2,
+**Configurar a VPN corporativa no macOS**. O conteúdo foi comparado após a
+remoção de HTML aplicada pelo backend.
+
+Essas evidências cobrem o recebimento da pergunta, a extração de palavras-chave
+e o retorno de artigos correspondentes da API do GLPI no laboratório.
+Consulte o [registro de validação](VALIDACAO-tarefa3.md) para os detalhes.
+A branch continua local e ainda não foi publicada no GitHub.
+
+Os testes locais automatizados continuam usando dados e respostas simuladas
+para verificar isoladamente o comportamento do código.
 
 Para rodar os testes automatizados, na pasta do projeto:
 
