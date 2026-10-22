@@ -1,104 +1,246 @@
-import argparse
-import json
-from typing import Any, Dict
+import os
+from dataclasses import dataclass
+from typing import Any
 
-try:
-    from domain_service import DomainService
-    from glpi_client import GLPIClient, pretty_print
-except ModuleNotFoundError:  # pragma: no cover - execução direta via python src/main.py
-    from src.domain_service import DomainService
-    from src.glpi_client import GLPIClient, pretty_print
+import requests
+import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from src.config.pydantic import (
+    ChatRequest,
+    FollowupRequest,
+    PasswordTokenRequest,
+    PaginationParams,
+    RefreshTokenRequest,
+    TicketCreateRequest,
+    TicketUpdateRequest,
+    validation_bypassed,
+)
+from src.config.pydantic.jwt import decode_glpi_jwt
+from src.config.pydantic.request import PydanticRequestValidationMiddleware
+from src.glpi_client import GLPIClient
+
+app = FastAPI(title="GLPI Chat Bot API", version="1.0.0")
+app.add_middleware(PydanticRequestValidationMiddleware)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Executa uma demonstração da API v2 do GLPI.")
-    parser.add_argument("--base-url", default="http://localhost:8080", help="Base URL do GLPI (ex.: http://localhost:8080)")
-    parser.add_argument("--client-id", help="client_id do OAuth2")
-    parser.add_argument("--client-secret", help="client_secret do OAuth2")
-    parser.add_argument("--username", help="Usuário GLPI")
-    parser.add_argument("--password", help="Senha do usuário GLPI")
-    parser.add_argument("--scope", default="api", help="Escopo OAuth2")
-    parser.add_argument("--write-demo", action="store_true", help="Executa também criação de ticket e comentário")
-    return parser
+@app.exception_handler(RequestValidationError)
+async def pydantic_validation_error_handler(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    del request
+    details = [
+        {"loc": error["loc"], "msg": error["msg"], "type": error["type"]}
+        for error in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": details})
 
 
-def run_demo(client: GLPIClient, write_demo: bool = False) -> None:
-    service = DomainService()
+@dataclass
+class GLPIAuthContext:
+    client: GLPIClient
+    user: Any
+    jwt_claims: dict[str, Any] | None
 
-    print("Obtendo token OAuth2...")
-    token_response = client.get_token()
-    service.update_from_api_response("account", token_response)
-    print(json.dumps(token_response, indent=2, ensure_ascii=False))
 
-    me_response = client.me()
-    service.update_from_api_response("users", me_response)
-    pretty_print("Usuário autenticado", me_response)
+def _new_glpi_client() -> GLPIClient:
+    return GLPIClient(base_url=os.getenv("GLPI_BASE_URL"))
 
-    tickets_response = client.ticket_list(start=0, limit=5)
-    service.update_from_api_response("tickets", tickets_response)
-    pretty_print("Lista de chamados", tickets_response)
 
-    articles_response = client.knowledgebase_articles(start=0, limit=5)
-    service.update_from_api_response("articles", articles_response)
-    pretty_print("Artigos da base de conhecimento", articles_response)
-
-    categories_response = client.itil_categories(start=0, limit=5)
-    service.update_from_api_response("categories", categories_response)
-    pretty_print("Categorias de chamado", categories_response)
-
-    users_response = client.users(start=0, limit=5)
-    service.update_from_api_response("users", users_response)
-    pretty_print("Usuários", users_response)
-
-    print("\nCache salvo em data/glpi_cache.json")
-    print(json.dumps(service.store.data, ensure_ascii=False, indent=2)[:800])
-
-    if write_demo:
-        ticket_result = client.create_ticket(
-            "Ticket criado pela API Python",
-            "<p>Este ticket foi gerado pela execução do cliente em Python.</p>",
+def get_glpi_auth_context(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> GLPIAuthContext:
+    if validation_bypassed():
+        context = GLPIAuthContext(client=_new_glpi_client(), user=None, jwt_claims=None)
+        request.state.glpi_auth = context
+        return context
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=401,
+            detail="Envie um token GLPI no cabeçalho Authorization: Bearer.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        pretty_print("Criação de chamado", ticket_result)
 
-        ticket_id = None
-        payload = ticket_result.get("data")
-        if isinstance(payload, dict):
-            ticket_id = payload.get("id") or payload.get("href")
-        if ticket_id is None:
-            print("Não foi possível localizar o ID do ticket criado.")
-            return
+    client = _new_glpi_client()
+    client.access_token = credentials.credentials
+    context = GLPIAuthContext(
+        client=client,
+        user=None,
+        jwt_claims=decode_glpi_jwt(credentials.credentials),
+    )
+    request.state.glpi_auth = context
+    return context
 
-        followup = client.add_followup(ticket_id, "Comentário adicionado pelo cliente Python.")
-        pretty_print("Adicionar followup", followup)
 
-        if isinstance(payload, dict):
-            update = client.update_ticket(ticket_id, name="Ticket atualizado via API Python")
-            pretty_print("Atualização do chamado", update)
+def _proxy_response(result: dict[str, Any]) -> Response:
+    status_code = result["status_code"]
+    if status_code == 204:
+        return Response(status_code=status_code)
+    return JSONResponse(status_code=status_code, content=result.get("data"))
+
+
+def _proxy_token_response(client: GLPIClient, payload: Any) -> Response:
+    status_code = client.last_status_code
+    if status_code is None:
+        raise HTTPException(status_code=502, detail="O GLPI não retornou um status HTTP para o token.")
+    if status_code == 204:
+        return Response(status_code=status_code)
+    return JSONResponse(status_code=status_code, content=payload)
+
+
+def _call_glpi(context: GLPIAuthContext, operation: str, *args: Any, **kwargs: Any) -> Response:
+    try:
+        result = getattr(context.client, operation)(*args, **kwargs)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Não foi possível concluir a chamada ao GLPI.") from exc
+    return _proxy_response(result)
+
+
+@app.post("/api/auth/token")
+def issue_token(payload: PasswordTokenRequest) -> Response:
+    client = GLPIClient(
+        base_url=os.getenv("GLPI_BASE_URL"),
+        client_id=payload.client_id,
+        client_secret=payload.client_secret,
+        username=payload.username,
+        password=payload.password,
+        scope=payload.scope,
+    )
+    try:
+        result = client.get_token()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Não foi possível solicitar um token ao GLPI.") from exc
+    return _proxy_token_response(client, result)
+
+
+@app.post("/api/auth/refresh")
+def refresh_token(payload: RefreshTokenRequest) -> Response:
+    client = GLPIClient(
+        base_url=os.getenv("GLPI_BASE_URL"),
+        client_id=payload.client_id,
+        client_secret=payload.client_secret,
+        scope=payload.scope,
+    )
+    client.refresh_token = payload.refresh_token
+    try:
+        result = client.refresh_token_request()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Não foi possível renovar o token no GLPI.") from exc
+    return _proxy_token_response(client, result)
+
+
+def _validate_ticket_id(ticket_id: int) -> None:
+    if not validation_bypassed() and ticket_id < 1:
+        raise HTTPException(status_code=422, detail="O ID do chamado deve ser maior que zero.")
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/api/me")
+def me(context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> Response:
+    if context.user is not None:
+        return JSONResponse(content=context.user)
+    return _call_glpi(context, "me")
+
+
+@app.get("/api/tickets")
+def list_tickets(
+    pagination: PaginationParams = Depends(),
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> Response:
+    return _call_glpi(context, "ticket_list", start=pagination.start, limit=pagination.limit)
+
+
+@app.get("/api/tickets/{ticket_id}")
+def ticket_detail(ticket_id: int, context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> Response:
+    _validate_ticket_id(ticket_id)
+    return _call_glpi(context, "ticket_detail", ticket_id)
+
+
+@app.get("/api/tickets/{ticket_id}/timeline")
+def ticket_timeline(ticket_id: int, context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> Response:
+    _validate_ticket_id(ticket_id)
+    return _call_glpi(context, "ticket_timeline", ticket_id)
+
+
+@app.post("/api/tickets")
+def create_ticket(
+    payload: TicketCreateRequest,
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> Response:
+    return _call_glpi(context, "create_ticket", payload.name, payload.content)
+
+
+@app.post("/api/tickets/{ticket_id}/followups")
+def add_followup(
+    ticket_id: int,
+    payload: FollowupRequest,
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> Response:
+    _validate_ticket_id(ticket_id)
+    return _call_glpi(context, "add_followup", ticket_id, payload.content)
+
+
+@app.patch("/api/tickets/{ticket_id}")
+def update_ticket(
+    ticket_id: int,
+    payload: TicketUpdateRequest,
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> Response:
+    _validate_ticket_id(ticket_id)
+    fields = payload.model_dump(exclude_unset=True)
+    return _call_glpi(context, "update_ticket", ticket_id, **fields)
+
+
+@app.get("/api/articles")
+def list_articles(
+    pagination: PaginationParams = Depends(),
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> Response:
+    return _call_glpi(context, "knowledgebase_articles", start=pagination.start, limit=pagination.limit)
+
+
+@app.get("/api/categories")
+def list_categories(
+    pagination: PaginationParams = Depends(),
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> Response:
+    return _call_glpi(context, "itil_categories", start=pagination.start, limit=pagination.limit)
+
+
+@app.get("/api/users")
+def list_users(
+    pagination: PaginationParams = Depends(),
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> Response:
+    return _call_glpi(context, "users", start=pagination.start, limit=pagination.limit)
+
+
+@app.post("/api/chat")
+def chat(payload: ChatRequest, context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> None:
+    del payload, context
+    raise HTTPException(
+        status_code=501,
+        detail="O endpoint de chat está validado, mas ainda não há um motor de conversa integrado.",
+    )
 
 
 def main() -> None:
-    args = build_parser().parse_args()
-
-    client = GLPIClient(
-        base_url=args.base_url,
-        client_id=args.client_id,
-        client_secret=args.client_secret,
-        username=args.username,
-        password=args.password,
-        scope=args.scope,
+    uvicorn.run(
+        "src.main:app",
+        host=os.getenv("API_HOST", "127.0.0.1"),
+        port=int(os.getenv("API_PORT", "8000")),
+        reload=os.getenv("APP_ENV", "").lower() == "development",
     )
-
-    try:
-        run_demo(client, write_demo=args.write_demo)
-    except ValueError as exc:
-        print(f"Erro de configuração: {exc}")
-        print("Exemplo de uso:")
-        print(
-            "python src/main.py --base-url http://localhost:8080 "
-            "--client-id <CLIENT_ID> --client-secret <CLIENT_SECRET> "
-            "--username glpi --password glpi"
-        )
-        raise SystemExit(1)
 
 
 if __name__ == "__main__":
