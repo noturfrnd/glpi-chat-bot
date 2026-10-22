@@ -14,13 +14,13 @@ class KnowledgeTests(unittest.TestCase):
     def test_pagination(self):
         class Client:
             def knowledgebase_articles(self, start, limit):
-                return {'status_code':206 if start == 0 else 200, 'data':[{'id':i} for i in range(3)][start:start+limit]}
+                return {'status_code':206 if start == 0 else 200, 'data':[{'id':i,'name':f'Artigo {i}'} for i in range(1,4)][start:start+limit]}
         self.assertEqual(len(fetch_articles(Client(),2)),3)
 
     def test_duplicate_page(self):
         class Client:
             def knowledgebase_articles(self, start, limit):
-                return {'status_code':206,'data':[{'id':1}]}
+                return {'status_code':206,'data':[{'id':1,'name':'Artigo 1'}]}
         with self.assertRaises(ValueError):
             fetch_articles(Client(),1)
 

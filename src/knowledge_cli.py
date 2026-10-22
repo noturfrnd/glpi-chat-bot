@@ -5,29 +5,7 @@ import sys
 from pathlib import Path
 from src.article_search import Busca
 from src.answer_context import preparar
-
-
-def fetch_articles(client, page_size=50):
-    if page_size < 1:
-        raise ValueError('Tamanho de página inválido.')
-    articles, seen, start = [], set(), 0
-    while True:
-        response = client.knowledgebase_articles(start=start, limit=page_size)
-        if not 200 <= response['status_code'] < 300:
-            raise ValueError(f"Falha na consulta de artigos: HTTP {response['status_code']}")
-        page = response['data']
-        if not isinstance(page, list):
-            raise ValueError('A API não retornou uma lista de artigos.')
-        for article in page:
-            if not isinstance(article, dict) or not isinstance(article.get('id'), int):
-                raise ValueError('Artigo sem ID válido.')
-            if article['id'] in seen:
-                raise ValueError('Paginação repetiu um artigo; cache não atualizado.')
-            seen.add(article['id'])
-        articles.extend(page)
-        start += len(page)
-        if len(page) < page_size:
-            return articles
+from src.knowledge_service import fetch_articles
 
 
 def load_articles(path):

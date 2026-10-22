@@ -1,12 +1,9 @@
 """Busca lexical local de artigos; não gera respostas nem chama uma IA."""
-import argparse
-import json
 import math
 import re
 import unicodedata
 from collections import Counter
 from html.parser import HTMLParser
-from pathlib import Path
 
 
 class TextoHTML(HTMLParser):
@@ -43,12 +40,34 @@ STOP = set('a o as os de da do das dos e em no na nos nas um uma para por com qu
 GENERICOS = set('configurar instalar acessar usar funciona funcionar windows macos favor ajuda gostaria saber posso pode consigo'.split())
 SINONIMOS = {'lenta': 'lentidao', 'lento': 'lentidao', 'lentissima': 'lentidao',
              'lentissimo': 'lentidao', 'mac': 'macos', 'wi': 'wifi'}
+MAX_PERGUNTA = 4000
+CONVERSACIONAIS = {
+    'oi', 'ola', 'obrigado', 'obrigada', 'tentando', 'tentar',
+    'me', 'te', 'voce', 'voces', 'ajudar', 'poderia',
+}
 
 
 def tokens(texto):
     texto = ''.join(c for c in unicodedata.normalize('NFKD', texto.lower()) if not unicodedata.combining(c))
-    texto = texto.replace('wi-fi', 'wifi')
+    texto = re.sub(r'\bwi[\s-]+fi\b', 'wifi', texto)
+    texto = re.sub(r'\be[\s-]+mail\b', 'email', texto)
     return [SINONIMOS.get(t, t) for t in re.findall(r'[a-z0-9]+', texto) if t not in STOP and len(t) > 1]
+
+
+def extrair_palavras_chave(pergunta: str) -> list[str]:
+    """Extrai termos locais, sem IA; conserva a ordem e o assunto desconhecido."""
+    if not isinstance(pergunta, str):
+        raise ValueError('A pergunta deve ser um texto.')
+    if not pergunta.strip():
+        raise ValueError('Digite uma pergunta.')
+    if len(pergunta) > MAX_PERGUNTA:
+        raise ValueError(f'A pergunta deve ter no máximo {MAX_PERGUNTA} caracteres.')
+    # Remove expressões completas para preservar palavras como "dia" quando
+    # fazem parte do assunto (por exemplo, "backup por dia").
+    texto = re.sub(r'\b(?:bom\s+dia|boa\s+tarde|boa\s+noite|tudo\s+bem)\b',
+                   ' ', pergunta, flags=re.IGNORECASE)
+    return list(dict.fromkeys(termo for termo in tokens(texto)
+                              if termo not in CONVERSACIONAIS))
 
 
 class Busca:
@@ -67,7 +86,7 @@ class Busca:
         self.media = sum(d['tamanho'] for d in self.docs) / max(1, len(self.docs)) or 1
 
     def pesquisar(self, pergunta, limite=3):
-        consulta = set(tokens(pergunta))
+        consulta = set(extrair_palavras_chave(pergunta))
         if limite < 1:
             raise ValueError('O limite deve ser positivo.')
         # Inclui palavras desconhecidas: Windows sozinho não sustenta uma

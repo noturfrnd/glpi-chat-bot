@@ -1,5 +1,9 @@
 # Busca de artigos — Sprint 1 em desenvolvimento
 
+Para a integração atual com `POST /api/chat` e os testes no Postman, veja
+[README-tarefa3.md](README-tarefa3.md). As instruções abaixo descrevem o fluxo
+original por terminal e suas validações anteriores.
+
 A busca reutiliza o cliente GLPIClient e o cache DomainService do projeto. Não chama uma IA e não modifica registros no GLPI.
 
 Na raiz do repositório, com as dependências de requirements.txt instaladas e as variáveis GLPI configuradas conforme .env.example:

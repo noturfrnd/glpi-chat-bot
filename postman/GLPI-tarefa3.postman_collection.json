@@ -1,0 +1,561 @@
+{
+  "info": {
+    "name": "GLPI COLLECTION SQUAD 15 — Tarefa 3",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Collection do grupo com testes da tarefa 3. Configure base_url, client_id, client_secret, username e password localmente. POST /api/chat consulta os artigos com o token do usuário; não gera texto com IA."
+  },
+  "item": [
+    {
+      "name": "Create Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "let body = {};",
+              "try { body = pm.response.json(); } catch (error) { body = {}; }",
+              "const ok = pm.response.code >= 200 && pm.response.code < 300 &&",
+              "    typeof body.access_token === \"string\" && body.access_token.length > 0;",
+              "pm.collectionVariables.set(\"access_token\", ok ? body.access_token : \"\");",
+              "pm.collectionVariables.set(\"refresh_token\",",
+              "    ok && typeof body.refresh_token === \"string\" ? body.refresh_token : \"\");",
+              "pm.test(\"Resposta contém um access_token válido\", function () {",
+              "    pm.expect(ok).to.equal(true);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_id\": \"{{client_id}}\",\n  \"client_secret\": \"{{client_secret}}\",\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"scope\": \"api\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/token",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "token"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Refresh Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "let body = {};",
+              "try { body = pm.response.json(); } catch (error) { body = {}; }",
+              "const ok = pm.response.code >= 200 && pm.response.code < 300 &&",
+              "    typeof body.access_token === \"string\" && body.access_token.length > 0;",
+              "pm.collectionVariables.set(\"access_token\", ok ? body.access_token : \"\");",
+              "pm.collectionVariables.set(\"refresh_token\",",
+              "    ok && typeof body.refresh_token === \"string\" ? body.refresh_token : \"\");",
+              "pm.test(\"Resposta contém um access_token válido\", function () {",
+              "    pm.expect(ok).to.equal(true);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"client_id\": \"{{client_id}}\",\r\n    \"client_secret\": \"{{client_secret}}\",\r\n    \"refresh_token\": \"{{refresh_token}}\",\r\n    \"scope\": \"api\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/refresh",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "refresh"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Validate Token",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "me"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Listar Tickets",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "disabled": true
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/tickets",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "tickets"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Tarefa 3 — processamento de perguntas",
+      "item": [
+        {
+          "name": "Busca natural",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.test(\"Pergunta e palavras-chave presentes\", function () {",
+                  "        pm.expect(typeof body.pergunta === \"string\").to.equal(true);",
+                  "        pm.expect(Array.isArray(body.palavras_chave) &&",
+                  "            body.palavras_chave.every(k => typeof k === \"string\")).to.equal(true);",
+                  "        pm.expect(new Set(body.palavras_chave).size === body.palavras_chave.length).to.equal(true);",
+                  "    });",
+                  "    pm.test(\"Artigos e total consistentes\", function () {",
+                  "        pm.expect(Array.isArray(body.artigos)).to.equal(true);",
+                  "        pm.expect(Number.isInteger(body.total) && body.total === body.artigos.length &&",
+                  "            body.total >= 0 && body.total <= 3).to.equal(true);",
+                  "        pm.expect(body.artigos.every(a => Number.isInteger(a.id) &&",
+                  "            typeof a.titulo === \"string\" && typeof a.conteudo === \"string\" &&",
+                  "            typeof a.pontuacao === \"number\" && typeof a.fonte_api === \"string\" &&",
+                  "            Array.isArray(a.termos_encontrados))).to.equal(true);",
+                  "    });",
+                  "}",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Palavras-chave esperadas\", function () {",
+                  "        const words = pm.response.json().palavras_chave;",
+                  "        pm.expect([\"vpn\", \"windows\"].every(k => words.includes(k))).to.equal(true);",
+                  "        pm.expect(!words.includes(\"oi\") && !words.includes(\"tentando\")).to.equal(true);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Oi, bom dia, estou tentando configurar a VPN no Windows e preciso de ajuda\",\n  \"history\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Busca com e-mail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.test(\"Pergunta e palavras-chave presentes\", function () {",
+                  "        pm.expect(typeof body.pergunta === \"string\").to.equal(true);",
+                  "        pm.expect(Array.isArray(body.palavras_chave) &&",
+                  "            body.palavras_chave.every(k => typeof k === \"string\")).to.equal(true);",
+                  "        pm.expect(new Set(body.palavras_chave).size === body.palavras_chave.length).to.equal(true);",
+                  "    });",
+                  "    pm.test(\"Artigos e total consistentes\", function () {",
+                  "        pm.expect(Array.isArray(body.artigos)).to.equal(true);",
+                  "        pm.expect(Number.isInteger(body.total) && body.total === body.artigos.length &&",
+                  "            body.total >= 0 && body.total <= 3).to.equal(true);",
+                  "        pm.expect(body.artigos.every(a => Number.isInteger(a.id) &&",
+                  "            typeof a.titulo === \"string\" && typeof a.conteudo === \"string\" &&",
+                  "            typeof a.pontuacao === \"number\" && typeof a.fonte_api === \"string\" &&",
+                  "            Array.isArray(a.termos_encontrados))).to.equal(true);",
+                  "    });",
+                  "}",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Palavras-chave esperadas\", function () {",
+                  "        const words = pm.response.json().palavras_chave;",
+                  "        pm.expect([\"assinatura\", \"email\"].every(k => words.includes(k))).to.equal(true);",
+                  "        pm.expect(!words.includes(\"oi\") && !words.includes(\"tentando\")).to.equal(true);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Como configurar assinatura de e-mail?\",\n  \"history\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assunto fora da base — confirmar no GLPI",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.test(\"Pergunta e palavras-chave presentes\", function () {",
+                  "        pm.expect(typeof body.pergunta === \"string\").to.equal(true);",
+                  "        pm.expect(Array.isArray(body.palavras_chave) &&",
+                  "            body.palavras_chave.every(k => typeof k === \"string\")).to.equal(true);",
+                  "        pm.expect(new Set(body.palavras_chave).size === body.palavras_chave.length).to.equal(true);",
+                  "    });",
+                  "    pm.test(\"Artigos e total consistentes\", function () {",
+                  "        pm.expect(Array.isArray(body.artigos)).to.equal(true);",
+                  "        pm.expect(Number.isInteger(body.total) && body.total === body.artigos.length &&",
+                  "            body.total >= 0 && body.total <= 3).to.equal(true);",
+                  "        pm.expect(body.artigos.every(a => Number.isInteger(a.id) &&",
+                  "            typeof a.titulo === \"string\" && typeof a.conteudo === \"string\" &&",
+                  "            typeof a.pontuacao === \"number\" && typeof a.fonte_api === \"string\" &&",
+                  "            Array.isArray(a.termos_encontrados))).to.equal(true);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Como configurar telescópio no Windows?\",\n  \"history\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mensagem vazia — 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"Erro explicado\", function () {",
+                  "    pm.expect(Object.prototype.hasOwnProperty.call(pm.response.json(), \"detail\")).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"   \",\n  \"history\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sem Bearer — 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Erro explicado\", function () {",
+                  "    pm.expect(Object.prototype.hasOwnProperty.call(pm.response.json(), \"detail\")).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Como configurar VPN no Windows?\",\n  \"history\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

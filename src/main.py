@@ -20,8 +20,10 @@ from src.config.pydantic import (
     validation_bypassed,
 )
 from src.config.pydantic.jwt import decode_glpi_jwt
+from src.config.pydantic.chat import ChatResponse
 from src.config.pydantic.request import PydanticRequestValidationMiddleware
 from src.glpi_client import GLPIClient
+from src.knowledge_service import ArticlesFetchError, processar_pergunta
 
 app = FastAPI(title="GLPI Chat Bot API", version="1.0.0")
 app.add_middleware(PydanticRequestValidationMiddleware)
@@ -225,13 +227,22 @@ def list_users(
     return _call_glpi(context, "users", start=pagination.start, limit=pagination.limit)
 
 
-@app.post("/api/chat")
-def chat(payload: ChatRequest, context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> None:
-    del payload, context
-    raise HTTPException(
-        status_code=501,
-        detail="O endpoint de chat está validado, mas ainda não há um motor de conversa integrado.",
-    )
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(
+    payload: ChatRequest, context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> dict[str, Any]:
+    try:
+        return processar_pergunta(payload.message, context.client)
+    except requests.Timeout as exc:
+        raise HTTPException(status_code=504, detail="O GLPI demorou para responder à consulta de artigos.") from exc
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Não foi possível consultar os artigos no GLPI.") from exc
+    except ArticlesFetchError as exc:
+        status_code = exc.status_code if exc.status_code in {401, 403, 429} else 502
+        headers = {"WWW-Authenticate": "Bearer"} if status_code == 401 else None
+        raise HTTPException(status_code=status_code, detail=str(exc), headers=headers) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def main() -> None:
