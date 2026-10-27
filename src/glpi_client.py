@@ -171,7 +171,7 @@ class GLPIClient:
                 ):
                     tickets_usuario.append(ticket)
 
-            if status == 200 or len(tickets) < limit or not tickets:
+            if len(tickets) < limit or not tickets:
                 break
 
             start += limit
