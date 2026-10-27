@@ -134,8 +134,12 @@ class APIValidationTests(unittest.TestCase):
 
         self.assertEqual(context.client.access_token, token)
         self.assertEqual(context.jwt_claims, {"sub": "user-1"})
-        self.assertEqual(me(context).status_code, 403)
+        from src.errors import GLPIError
 
+        with self.assertRaises(GLPIError) as erro:
+            me(context)
+        self.assertEqual(erro.exception.status_code, 403)
+        self.assertEqual(erro.exception.codigo, "GLPI_SEM_PERMISSAO")
         class TicketClientStub:
             def ticket_list(self, *, start, limit):
                 return {"status_code": 206, "data": [{"id": 1}]}
