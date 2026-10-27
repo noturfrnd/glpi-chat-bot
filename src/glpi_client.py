@@ -27,6 +27,7 @@ class GLPIClient:
         self.scope = scope
         self.access_token: Optional[str] = None
         self.refresh_token: Optional[str] = None
+        self.last_status_code: Optional[int] = None
 
     def ensure_credentials(self) -> None:
         missing = [
@@ -57,6 +58,7 @@ class GLPIClient:
             "scope": self.scope,
         }
         response = requests.post(f"{self.base_url}/api.php/token", json=payload, timeout=30)
+        self.last_status_code = response.status_code
         data = self._parse_response(response)
         if response.status_code == 200 and isinstance(data, dict):
             self.access_token = data.get("access_token")
@@ -74,6 +76,7 @@ class GLPIClient:
             "scope": self.scope,
         }
         response = requests.post(f"{self.base_url}/api.php/token", json=payload, timeout=30)
+        self.last_status_code = response.status_code
         data = self._parse_response(response)
         if response.status_code == 200 and isinstance(data, dict):
             self.access_token = data.get("access_token")

@@ -194,3 +194,80 @@ Confirmado ao vivo:
     código — tentar de novo ou mudar o corpo da requisição não resolve. Se
     seu agente precisa registrar algo num chamado fechado, use o
     `Followup` acima, que não tem essa restrição.
+
+  ## API FastAPI da aplicação
+
+  As operações do GLPI são expostas diretamente pela aplicação FastAPI em
+  `src/main.py`:
+
+      uvicorn src.main:app --host 127.0.0.1 --port 8000
+
+  Ou inicie a aplicação com `python -m src.main`.
+
+  O OpenAPI interativo fica em `/docs`. As rotas estão sob `/api`: usuário
+  autenticado, listagem/detalhe/timeline/criação/atualização de chamados,
+  acompanhamentos, artigos, categorias e usuários. O proxy preserva os códigos
+  HTTP do GLPI (incluindo `201` e `206`).
+
+  Todas as requisições HTTP passam primeiro por `PydanticRequestValidationMiddleware`,
+  que valida globalmente método, caminho, query string, formato JSON e tamanho
+  do corpo (limite de 1 MB). Cada rota ainda valida seus próprios campos e
+  tipos usando modelos Pydantic específicos; a validação por rota não substitui
+  essa validação global.
+
+  Em uso normal, envie um access token OAuth2 do GLPI como
+  `Authorization: Bearer <token>`. O serviço valida o token consultando
+  `/Administration/User/Me` no GLPI. Se o token tiver formato JWT, seus claims
+  são decodificados depois dessa validação remota; o conteúdo localmente
+  decodificado não é usado para autenticar. Tokens opacos também são aceitos
+  quando o GLPI os reconhece.
+
+  Os corpos de criação de chamados e acompanhamentos têm limites de tamanho.
+  `POST /api/chat` valida mensagem (até 4000 caracteres) e histórico (até 50
+  itens, apenas papéis `user`/`assistant`), mas responde `501` até que um motor
+  de conversa seja integrado.
+
+  Para testes locais, o bypass das validações adicionais e da autenticação
+  Bearer pode ser habilitado somente com as duas variáveis:
+
+      APP_ENV=development
+      DEV_BYPASS_API_VALIDATION=true
+
+  O bypass não é ativado fora de `development`, mesmo se a segunda variável
+  estiver ligada. Ele não desativa a validação estrutural de tipos do Pydantic.
+  Não habilite essa configuração em ambientes compartilhados ou de produção.
+
+  **Autorização por endpoint:** o middleware não pré-valida o token chamando
+  `/Administration/User/Me`. Ele encaminha o Bearer para a rota GLPI solicitada
+  para evitar bloquear tokens cujo escopo permite tickets, mas não o endpoint
+  de usuário autenticado. Assim, `/api/me` pode retornar `403` por falta de
+  escopo mesmo quando `/api/tickets` funciona; o GLPI exige que esse escopo seja
+  concedido separadamente.
+
+  A aplicação e suas rotas vivem em `src/main.py` (não em um módulo FastAPI
+  separado). O fluxo OAuth existente também está exposto em
+  `POST /api/auth/token` e `POST /api/auth/refresh`; os dois corpos são
+  validados com modelos Pydantic antes de chamar o GLPI.
+
+## Resumo das mudanças
+
+- **FastAPI integrado:** a aplicação e todas as rotas ficam em `src/main.py`.
+  Inicie com `uvicorn src.main:app --host 127.0.0.1 --port 8000` ou
+  `python -m src.main`. A documentação interativa fica em `/docs`.
+- **Rotas disponíveis:** operações de autenticação OAuth, `/api/me`,
+  `/api/tickets` (lista, detalhes, timeline e escrita), `/api/articles`,
+  `/api/categories` e `/api/users`.
+- **Token e permissões:** envie `Authorization: Bearer <token>`. A aplicação
+  encaminha o token à rota GLPI solicitada; o próprio GLPI verifica o escopo.
+  `/api/me` pode responder `403` por falta de escopo mesmo quando
+  `/api/tickets` funciona. Essa regra por endpoint substitui qualquer
+  descrição anterior que diga que `/api/me` é chamado para pré-validar todas
+  as requisições.
+- **Validação Pydantic:** middleware valida globalmente método, caminho,
+  query string, JSON e tamanho máximo do corpo (1 MB). Modelos por rota
+  também verificam campos: paginação, autenticação, chamados, acompanhamentos
+  e chat. O chat limita mensagem a 4.000 caracteres e histórico a 50 itens.
+- **Bypass local:** `APP_ENV=development` e
+  `DEV_BYPASS_API_VALIDATION=true` desativam as verificações extras para
+  testes. Não habilite em produção.
+- **Testes:** `python -m unittest discover -s tests`.
