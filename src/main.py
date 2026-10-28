@@ -160,6 +160,49 @@ def list_tickets(
     return _call_glpi(context, "ticket_list", start=pagination.start, limit=pagination.limit)
 
 
+@app.get("/api/users/{user_id}/tickets")
+def tickets_by_user(
+    user_id: int,
+    limit: int = 100,
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+) -> Response:
+    if user_id < 1:
+        raise HTTPException(
+            status_code=422,
+            detail="O ID do usuário deve ser maior que zero.",
+        )
+
+    if not 1 <= limit <= 200:
+        raise HTTPException(
+            status_code=422,
+            detail="O limite deve estar entre 1 e 200.",
+        )
+
+    try:
+        result = context.client.tickets_by_user(
+            user_id=user_id,
+            limit=limit,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível consultar os tickets no GLPI.",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="O GLPI retornou uma resposta inesperada.",
+        ) from exc
+
+    status_code = result["status_code"]
+    content = {
+        key: value
+        for key, value in result.items()
+        if key != "status_code"
+    }
+
+    return JSONResponse(status_code=status_code, content=content)
+
 @app.get("/api/tickets/{ticket_id}")
 def ticket_detail(ticket_id: int, context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> Response:
     _validate_ticket_id(ticket_id)
