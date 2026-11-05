@@ -326,7 +326,14 @@ class APIValidationTests(unittest.TestCase):
             os.environ,
             {"APP_ENV": "test", "DEV_BYPASS_API_VALIDATION": "false"},
         ):
-            app.dependency_overrides[get_glpi_auth_context] = lambda: None
+            class ArticlesClientStub:
+                def knowledgebase_articles(self, *, start, limit):
+                    return {"status_code": 200, "data": []}
+
+            from src.main import GLPIAuthContext
+            app.dependency_overrides[get_glpi_auth_context] = lambda: GLPIAuthContext(
+                client=ArticlesClientStub(), user=None, jwt_claims=None,
+            )
             try:
                 health_status, _ = asyncio.run(send_request("GET", "/health"))
                 invalid_status, _ = asyncio.run(send_request("POST", "/api/chat", {"message": " "}))
@@ -336,7 +343,7 @@ class APIValidationTests(unittest.TestCase):
 
         self.assertEqual(health_status, 200)
         self.assertEqual(invalid_status, 422)
-        self.assertEqual(chat_status, 501)
+        self.assertEqual(chat_status, 200)
 
 
     def test_auth_token_requests_are_validated_by_pydantic(self):

@@ -224,8 +224,12 @@ Confirmado ao vivo:
 
   Os corpos de criação de chamados e acompanhamentos têm limites de tamanho.
   `POST /api/chat` valida mensagem (até 4000 caracteres) e histórico (até 50
-  itens, apenas papéis `user`/`assistant`), mas responde `501` até que um motor
-  de conversa seja integrado.
+  itens, apenas papéis `user`/`assistant`). A tarefa 3 processa a mensagem,
+  extrai palavras-chave e retorna até três artigos relevantes consultados no
+  GLPI com o Bearer recebido. A resposta contém `pergunta`, `palavras_chave`,
+  `artigos` e `total`. O histórico continua aceito, mas ainda não participa da
+  busca, e não há geração de texto por IA. Veja `README-tarefa3.md` para
+  executar os testes e usar a collection Postman.
 
   Para testes locais, o bypass das validações adicionais e da autenticação
   Bearer pode ser habilitado somente com as duas variáveis:

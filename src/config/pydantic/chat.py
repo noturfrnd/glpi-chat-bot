@@ -1,12 +1,28 @@
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.config.pydantic.base import APIInputModel
 
 
 MAX_MESSAGE_LENGTH = 4_000
 MAX_HISTORY_MESSAGES = 50
+
+
+class ArticleResult(BaseModel):
+    id: int
+    titulo: str
+    conteudo: str
+    pontuacao: float
+    termos_encontrados: list[str]
+    fonte_api: str
+
+
+class ChatResponse(BaseModel):
+    pergunta: str
+    palavras_chave: list[str]
+    artigos: list[ArticleResult]
+    total: int
 
 
 class ChatHistoryMessage(APIInputModel):
