@@ -1,4 +1,12 @@
 data*
 
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Credenciais
+.env
+
 # Collections do Postman são compartilhadas separadamente com a equipe.
 *.postman_collection.json
