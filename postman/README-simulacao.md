@@ -23,8 +23,9 @@ Este é um processo de teste separado. Para usar o GLPI real depois, inicie
 
 ## 2. Importar a collection
 
-No Postman, clique em **Import** e selecione
-`Tarefa3-SIMULACAO.postman_collection.json`.
+Solicite ao responsável pela tarefa o arquivo
+`Tarefa3-SIMULACAO.postman_collection.json`, distribuído separadamente do
+repositório. No Postman, clique em **Import** e selecione o arquivo recebido.
 
 O nome exibido será **SIMULAÇÃO LOCAL — Tarefa 3 — sem GLPI real**.
 As variáveis já estão preenchidas:
@@ -90,8 +91,9 @@ o comando do passo 1 para repetir no Postman.
 | --- | --- |
 | Receber o texto da pergunta | Verificado pela rota HTTP e pelos campos retornados |
 | Processar texto e identificar palavras-chave | Verificado com pergunta natural e normalização de e-mail |
-| Retornar dados da API GLPI conforme as palavras-chave | Seleção testada com dados fictícios; integração real pendente |
+| Retornar dados da API GLPI conforme as palavras-chave | Seleção testada com dados fictícios; integração real documentada separadamente |
 
-Assim que o grupo fornecer o endereço do GLPI e as credenciais apropriadas,
-use `GLPI-tarefa3.postman_collection.json` para testar a base real e concluir
-o último critério.
+Para testar a base real, solicite também `GLPI-tarefa3.postman_collection.json`,
+distribuída separadamente, e siga o [guia da tarefa 3](../README-tarefa3.md).
+A validação com o GLPI do laboratório está registrada em
+[VALIDACAO-tarefa3.md](../VALIDACAO-tarefa3.md).

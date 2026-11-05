@@ -50,9 +50,12 @@ que faz parte do corpus do laboratório.
 ## Resultado da collection
 
 Foram executados **Create Token** e os **cinco pedidos da tarefa 3** da collection
-`postman/GLPI-tarefa3.postman_collection.json`: **16/16 verificações aprovadas**,
+`GLPI-tarefa3.postman_collection.json`: **16/16 verificações aprovadas**,
 sem falhas. Os pedidos de renovação de token, perfil e listagem de chamados não
 fizeram parte desta execução, pois pertencem a outros fluxos.
+
+A collection usada nesta validação é distribuída separadamente do repositório
+pelo responsável pela tarefa; sua retirada do Git não altera os resultados registrados.
 
 O roteiro adicional fez **55 verificações**, incluindo as comparações dos artigos
 com o GLPI e o tratamento das entradas. Todas passaram. Esses números se referem
@@ -87,4 +90,4 @@ usuário utilizado, pois outra base ou outro perfil pode produzir resultados dis
 
 O material está pronto para revisão na branch `feat/tarefa3-processamento-perguntas`.
 A validação não altera a `main`; a integração da contribuição depende da revisão.
-Credenciais e tokens não fazem parte deste relatório nem da collection versionada.
+Credenciais e tokens de acesso real não fazem parte deste relatório nem da collection para compartilhamento.

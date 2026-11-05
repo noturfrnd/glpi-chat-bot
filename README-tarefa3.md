@@ -62,7 +62,7 @@ O ambiente virtual citado acima foi preparado para esta cópia local. Em outro c
 
 ## Importar e usar a collection no Postman
 
-1. Clique em **Import** e selecione `GLPI-tarefa3.postman_collection.json`. No repositório, ela está na pasta `postman`.
+1. Solicite ao responsável pela tarefa o arquivo `GLPI-tarefa3.postman_collection.json`, distribuído separadamente do repositório. No Postman, clique em **Import** e selecione o arquivo recebido.
 2. Abra as variáveis da collection. `base_url` já aponta para `http://127.0.0.1:8000`.
 3. Preencha localmente `client_id`, `client_secret`, `username` e `password` com os valores fornecidos pelo grupo. A collection entregue mantém esses campos vazios. Não publique nem compartilhe credenciais ou tokens; antes de exportar uma cópia, remova esses valores.
 4. Deixe `access_token` e `refresh_token` vazios inicialmente. Evite criar variáveis de ambiente com os mesmos nomes, pois elas podem sobrescrever as variáveis da collection.

@@ -57,7 +57,7 @@ Cada artigo contém id, titulo, conteudo, pontuacao, termos_encontrados e fonte_
 | src/knowledge_service.py | Consulta as páginas do GLPI e coordena a seleção dos artigos. |
 | src/config/pydantic/chat.py | Define os modelos de pergunta e resposta usados pela rota. |
 | tests/ | Verifica entrada, extração, busca, integração da rota e erros com respostas controladas. |
-| postman/ | Reúne as collections de integração real e simulação, com verificações automáticas. |
+| postman/ | Contém o roteiro de simulação. As collections de integração real e simulação são distribuídas separadamente do repositório. |
 
 A consulta utiliza GET /api.php/v2/Knowledgebase/Article, paginada por start e limit. O endereço de fonte retornado identifica o artigo no GLPI, por exemplo /api.php/v2/Knowledgebase/Article/1.
 
@@ -98,11 +98,11 @@ Também realizamos a repetição manual no Postman. A captura da busca natural c
 
 3. Iniciar a API com python -m uvicorn src.main:app --host 127.0.0.1 --port 8000 e manter o terminal aberto durante os testes.
 
-4. Importar postman/GLPI-tarefa3.postman_collection.json. Definir base_url=http://127.0.0.1:8000 e preencher client_id, client_secret, username e password com as credenciais autorizadas do laboratório.
+4. Solicitar ao responsável pela tarefa a collection GLPI-tarefa3.postman_collection.json, distribuída separadamente do repositório, e importá-la no Postman. Definir base_url=http://127.0.0.1:8000 e preencher client_id, client_secret, username e password com as credenciais autorizadas do laboratório.
 
 5. Executar Create Token e confirmar HTTP 200. O script salva o token na collection. Em seguida, executar os cinco pedidos da tarefa 3 e conferir o corpo da resposta e Test Results.
 
-A porta 8080 pertence ao GLPI; a porta 8000, ao backend do projeto. A porta 8001 pertence ao servidor separado de simulação. As collections versionadas mantêm vazios os campos de credenciais e tokens de acesso real.
+A porta 8080 pertence ao GLPI; a porta 8000, ao backend do projeto. A porta 8001 pertence ao servidor separado de simulação. As collections para compartilhamento mantêm vazios os campos de credenciais e tokens de acesso real.
 
 ## Limitações e estado da entrega
 
@@ -112,7 +112,7 @@ A consulta é limitada a 20 páginas de até 50 artigos. Se não for possível c
 
 No laboratório, tokens malformados ou com assinatura inválida receberam HTTP 400 do GLPI, convertido em 502 pelo tratamento atual do backend. Esse comportamento foi documentado. O caso de Bearer ausente retorna 401.
 
-A entrega está preparada na branch feat/tarefa3-processamento-perguntas, com revisão local e evidências registradas. A publicação no GitHub e a abertura do Pull Request ainda não foram confirmadas. A integração à main depende da revisão da equipe.
+A contribuição foi publicada na branch feat/tarefa3-processamento-perguntas e está em revisão no [Pull Request #5](https://github.com/noturfrnd/glpi-chat-bot/pull/5), com evidências registradas. Conforme a solicitação de revisão, as duas collections do Postman são distribuídas separadamente do repositório. A integração à main depende da revisão da equipe.
 
 ## Texto para incorporar ao relatório final
 
