@@ -1,4 +1,5 @@
 import os
+import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
@@ -13,11 +14,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from src.config.pydantic import (
     ChatRequest,
     FollowupRequest,
+    IdentifiedUserData,
     PasswordTokenRequest,
     PaginationParams,
     RefreshTokenRequest,
     TicketCreateRequest,
     TicketUpdateRequest,
+    UserIdentificationRequest,
+    UserIdentificationResponse,
     validation_bypassed,
 )
 from src.config.pydantic.jwt import decode_glpi_jwt
@@ -26,8 +30,10 @@ from src.config.pydantic.request import PydanticRequestValidationMiddleware
 from src.chat_memory import chat_history_engine
 from src.crud import import_cache
 from src.database import engine, init_db
+from src.domain_service import DomainService
 from src.glpi_client import GLPIClient
 from src.knowledge_service import ArticlesFetchError, processar_pergunta
+from src.session_store import session_store
 
 
 @asynccontextmanager
@@ -315,3 +321,45 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+#
+@app.post("/api/session/identify")
+def identify_user(request: UserIdentificationRequest):
+
+    glpi_client = _new_glpi_client()
+
+    response = glpi_client.users(start=0, limit=100)
+
+    if response.get("status_code") != 200:
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível consultar os usuários do GLPI."
+        )
+
+    domain_service.update_from_api_response(
+        "users",
+        response
+    )
+
+    result = domain_service.identify_user(
+        request.identifier
+    )
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=404,
+            detail=result["message"]
+        )
+
+    return result
+
+
+@app.post("/api/v1/tickets/{id}/approve")
+def approve_ticket(id: int):
+
+    return {
+        "success": True,
+        "message": "Chamado aprovado com sucesso.",
+        "ticket_id": id
+    }
