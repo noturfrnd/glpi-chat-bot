@@ -19,7 +19,11 @@ class GLPIClient:
         password: Optional[str] = None,
         scope: str = "api",
     ) -> None:
-        self.base_url = (base_url or os.getenv("GLPI_BASE_URL") or "http://localhost:8080").rstrip("/")
+        self.base_url = (
+            base_url
+            or os.getenv("GLPI_BASE_URL")
+            or "http://146.235.38.123:8080"
+        ).rstrip("/")
         self.client_id = client_id or os.getenv("GLPI_CLIENT_ID")
         self.client_secret = client_secret or os.getenv("GLPI_CLIENT_SECRET")
         self.username = username or os.getenv("GLPI_USERNAME")
@@ -129,6 +133,59 @@ class GLPIClient:
             "/api.php/v2/Assistance/Ticket",
             params={"start": start, "limit": limit},
         )
+
+    def tickets_by_user(
+            self,
+            user_id: int,
+            limit: int = 100
+    ) -> Dict[str, Any]:
+
+        if user_id <= 0:
+            raise ValueError("O ID do usuário deve ser positivo.")
+
+        if limit <= 0:
+            raise ValueError("O limite deve ser positivo.")
+
+        tickets_usuario = []
+        start = 0
+
+        while True:
+            response = self.ticket_list(start=start, limit=limit)
+
+            status = response["status_code"]
+
+            if not 200 <= status < 300:
+                return {
+                    "status_code": status,
+                    "data": response["data"],
+                }
+
+            tickets = response["data"]
+
+            if not isinstance(tickets, list):
+                raise ValueError("Resposta inesperada da API GLPI.")
+
+            for ticket in tickets:
+                team = ticket.get("team") or []
+
+                if any(
+                    member.get("id") == user_id
+                    and member.get("role") == "requester"
+                    for member in team
+                ):
+                    tickets_usuario.append(ticket)
+
+            if len(tickets) < limit or not tickets:
+                break
+
+            start += limit
+
+        return {
+            "status_code": 200,
+            "user_id": user_id,
+            "total": len(tickets_usuario),
+            "data": tickets_usuario,
+        }
 
     def ticket_detail(self, ticket_id: int) -> Dict[str, Any]:
         return self.request("GET", f"/api.php/v2/Assistance/Ticket/{ticket_id}")
