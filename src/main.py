@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
@@ -27,6 +28,7 @@ from src.config.pydantic import (
 from src.config.pydantic.jwt import decode_glpi_jwt
 from src.config.pydantic.chat import ChatResponse
 from src.config.pydantic.request import PydanticRequestValidationMiddleware
+from src.errors import GLPIConfigError, GLPIError, erro_glpi_por_status, register_error_handlers
 from src.chat_memory import chat_history_engine
 from src.crud import import_cache
 from src.database import engine, init_db
@@ -34,6 +36,8 @@ from src.domain_service import DomainService
 from src.glpi_client import GLPIClient
 from src.knowledge_service import ArticlesFetchError, processar_pergunta
 from src.session_store import session_store
+
+logger = logging.getLogger("glpi_chat_bot")
 
 
 @asynccontextmanager
@@ -49,6 +53,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="GLPI Chat Bot API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(PydanticRequestValidationMiddleware)
+register_error_handlers(app)
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -102,8 +107,19 @@ def get_glpi_auth_context(
     return context
 
 
+def _executar_glpi(funcao: Any, *args: Any, **kwargs: Any) -> Any:
+    """Executa uma chamada ao GLPI. Erros de rede são tratados pelos handlers globais."""
+    try:
+        return funcao(*args, **kwargs)
+    except ValueError as exc:
+        logger.error("Configuração do GLPI incompleta ou inválida: %s", exc)
+        raise GLPIConfigError() from exc
+
+
 def _proxy_response(result: dict[str, Any]) -> Response:
     status_code = result["status_code"]
+    if status_code >= 400:
+        raise erro_glpi_por_status(status_code, result.get("data"))
     if status_code == 204:
         return Response(status_code=status_code)
     return JSONResponse(status_code=status_code, content=result.get("data"))
@@ -113,16 +129,15 @@ def _proxy_token_response(client: GLPIClient, payload: Any) -> Response:
     status_code = client.last_status_code
     if status_code is None:
         raise HTTPException(status_code=502, detail="O GLPI não retornou um status HTTP para o token.")
+    if status_code >= 400:
+        raise erro_glpi_por_status(status_code, payload, token=True)
     if status_code == 204:
         return Response(status_code=status_code)
     return JSONResponse(status_code=status_code, content=payload)
 
 
 def _call_glpi(context: GLPIAuthContext, operation: str, *args: Any, **kwargs: Any) -> Response:
-    try:
-        result = getattr(context.client, operation)(*args, **kwargs)
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Não foi possível concluir a chamada ao GLPI.") from exc
+    result = _executar_glpi(getattr(context.client, operation), *args, **kwargs)
     return _proxy_response(result)
 
 
@@ -136,10 +151,7 @@ def issue_token(payload: PasswordTokenRequest) -> Response:
         password=payload.password,
         scope=payload.scope,
     )
-    try:
-        result = client.get_token()
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Não foi possível solicitar um token ao GLPI.") from exc
+    result = _executar_glpi(client.get_token)
     return _proxy_token_response(client, result)
 
 
@@ -152,10 +164,7 @@ def refresh_token(payload: RefreshTokenRequest) -> Response:
         scope=payload.scope,
     )
     client.refresh_token = payload.refresh_token
-    try:
-        result = client.refresh_token_request()
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Não foi possível renovar o token no GLPI.") from exc
+    result = _executar_glpi(client.refresh_token_request)
     return _proxy_token_response(client, result)
 
 
@@ -268,6 +277,25 @@ def update_ticket(
     return _call_glpi(context, "update_ticket", ticket_id, **fields)
 
 
+@app.post("/api/tickets/{ticket_id}/approve")
+@app.post("/api/v1/tickets/{ticket_id}/approve")
+def approve_ticket(ticket_id: int, context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> Response:
+    _validate_ticket_id(ticket_id)
+    try:
+        return _call_glpi(context, "approve_ticket", ticket_id)
+    except GLPIError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.mensagem, "codigo": exc.codigo},
+            headers=exc.headers,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível conectar ao GLPI.",
+        ) from exc
+
+
 @app.get("/api/articles")
 def list_articles(
     pagination: PaginationParams = Depends(),
@@ -310,6 +338,33 @@ def chat(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.post("/api/session/identify", response_model=UserIdentificationResponse)
+def identify_user(request: UserIdentificationRequest) -> UserIdentificationResponse:
+    glpi_client = _new_glpi_client()
+    response = glpi_client.users(start=0, limit=100)
+
+    if response.get("status_code") != 200:
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível consultar os usuários do GLPI.",
+        )
+
+    domain_service = DomainService()
+    domain_service.update_from_api_response("users", response)
+    result = domain_service.identify_user(request.identifier)
+
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    session_id = request.session_id or str(uuid.uuid4())
+    session_store.save_session(session_id, result["user"])
+    return UserIdentificationResponse(
+        message=result["message"],
+        session_id=session_id,
+        user=IdentifiedUserData(**result["user"]),
+    )
+
+
 def main() -> None:
     uvicorn.run(
         "src.main:app",
@@ -321,45 +376,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-#
-@app.post("/api/session/identify")
-def identify_user(request: UserIdentificationRequest):
-
-    glpi_client = _new_glpi_client()
-
-    response = glpi_client.users(start=0, limit=100)
-
-    if response.get("status_code") != 200:
-        raise HTTPException(
-            status_code=502,
-            detail="Não foi possível consultar os usuários do GLPI."
-        )
-
-    domain_service.update_from_api_response(
-        "users",
-        response
-    )
-
-    result = domain_service.identify_user(
-        request.identifier
-    )
-
-    if not result["success"]:
-        raise HTTPException(
-            status_code=404,
-            detail=result["message"]
-        )
-
-    return result
-
-
-@app.post("/api/v1/tickets/{id}/approve")
-def approve_ticket(id: int):
-
-    return {
-        "success": True,
-        "message": "Chamado aprovado com sucesso.",
-        "ticket_id": id
-    }
