@@ -50,14 +50,26 @@ class DomainService:
         ).to_dict()
 
     def _normalize_user(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        username = payload.get("name") or payload.get("username")
+        email = payload.get("email")
+        if not email:
+            emails_raw = payload.get("emails") or []
+            if isinstance(emails_raw, list) and emails_raw:
+                first = emails_raw[0]
+                if isinstance(first, dict):
+                    email = first.get("email")
+                elif isinstance(first, str):
+                    email = first
+
         return GLPIUser(
             id=payload.get("id"),
-            username=payload.get("username"),
+            username=username,
             realname=payload.get("realname"),
             firstname=payload.get("firstname"),
-            email=(payload.get("emails") or [{}])[0].get("email") if isinstance((payload.get("emails") or [{}])[0], dict) else None,
+            email=email,
             is_active=bool(payload.get("is_active", True)),
             extra={
+                "name": payload.get("name"),
                 "default_entity": payload.get("default_entity"),
                 "location": payload.get("location"),
                 "emails": payload.get("emails"),
@@ -131,3 +143,82 @@ class DomainService:
     def load_from_cache(self) -> Dict[str, List[Dict[str, Any]]]:
         self.store.load()
         return self.store.data
+
+    def identify_user(
+        self,
+        identifier: str,
+        users: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Identifica um usuário do GLPI pelo login ou e-mail com comparação consistente."""
+        identifier = (identifier or "").strip().casefold()
+
+        if not identifier:
+            return {
+                "success": False,
+                "status": "INVALID_INPUT",
+                "message": "Informe um usuário ou e-mail.",
+                "user": None,
+                "total": 0,
+            }
+
+        candidate_users = users if users is not None else self.get("users")
+        found_users = []
+
+        for user in candidate_users:
+            username = str(user.get("username") or user.get("name") or "").strip().casefold()
+
+            emails = []
+            if user.get("email"):
+                emails.append(str(user["email"]))
+
+            extra = user.get("extra") or {}
+            extra_emails = extra.get("emails") or []
+            if isinstance(extra_emails, list):
+                for em in extra_emails:
+                    if isinstance(em, dict):
+                        em_val = em.get("email")
+                        if em_val:
+                            emails.append(str(em_val))
+                    elif isinstance(em, str) and em:
+                        emails.append(em)
+
+            normalized_emails = [e.strip().casefold() for e in emails]
+
+            if identifier == username or identifier in normalized_emails:
+                found_users.append(user)
+
+        if not found_users:
+            return {
+                "success": False,
+                "status": "NOT_FOUND",
+                "message": "Usuário não encontrado no GLPI.",
+                "user": None,
+                "total": 0,
+            }
+
+        if len(found_users) > 1:
+            return {
+                "success": False,
+                "status": "AMBIGUOUS",
+                "message": "Mais de um usuário localizado. Por favor, informe seu e-mail institucional completo.",
+                "user": None,
+                "total": len(found_users),
+            }
+
+        identified = found_users[0]
+        safe_user_data = {
+            "id": identified.get("id"),
+            "name": identified.get("username") or identified.get("name"),
+            "realname": identified.get("realname"),
+            "firstname": identified.get("firstname"),
+            "email": identified.get("email"),
+            "is_active": identified.get("is_active", True),
+        }
+
+        return {
+            "success": True,
+            "status": "IDENTIFIED",
+            "message": "Usuário identificado com sucesso.",
+            "user": safe_user_data,
+            "total": 1,
+        }

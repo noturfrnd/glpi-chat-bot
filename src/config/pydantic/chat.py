@@ -52,6 +52,7 @@ class ChatHistoryMessage(APIInputModel):
 
 class ChatRequest(APIInputModel):
     message: str = Field(json_schema_extra={"minLength": 1, "maxLength": MAX_MESSAGE_LENGTH})
+    session_id: str | None = Field(default=None, json_schema_extra={"maxLength": 128})
     history: list[ChatHistoryMessage] = Field(
         default_factory=list,
         json_schema_extra={"maxItems": MAX_HISTORY_MESSAGES},

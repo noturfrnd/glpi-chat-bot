@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
@@ -14,22 +15,27 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from src.config.pydantic import (
     ChatRequest,
     FollowupRequest,
+    IdentifiedUserData,
     PasswordTokenRequest,
     PaginationParams,
     RefreshTokenRequest,
     TicketCreateRequest,
     TicketUpdateRequest,
+    UserIdentificationRequest,
+    UserIdentificationResponse,
     validation_bypassed,
 )
 from src.config.pydantic.jwt import decode_glpi_jwt
 from src.config.pydantic.chat import ChatResponse
 from src.config.pydantic.request import PydanticRequestValidationMiddleware
-from src.errors import GLPIConfigError, erro_glpi_por_status, register_error_handlers
+from src.errors import GLPIConfigError, GLPIError, erro_glpi_por_status, register_error_handlers
 from src.chat_memory import chat_history_engine
 from src.crud import import_cache
 from src.database import engine, init_db
+from src.domain_service import DomainService
 from src.glpi_client import GLPIClient
 from src.knowledge_service import ArticlesFetchError, processar_pergunta
+from src.session_store import session_store
 
 logger = logging.getLogger("glpi_chat_bot")
 
@@ -275,7 +281,19 @@ def update_ticket(
 @app.post("/api/v1/tickets/{ticket_id}/approve")
 def approve_ticket(ticket_id: int, context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> Response:
     _validate_ticket_id(ticket_id)
-    return _call_glpi(context, "approve_ticket", ticket_id)
+    try:
+        return _call_glpi(context, "approve_ticket", ticket_id)
+    except GLPIError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.mensagem, "codigo": exc.codigo},
+            headers=exc.headers,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível conectar ao GLPI.",
+        ) from exc
 
 
 @app.get("/api/articles")
@@ -318,6 +336,33 @@ def chat(
         raise HTTPException(status_code=status_code, detail=str(exc), headers=headers) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/session/identify", response_model=UserIdentificationResponse)
+def identify_user(request: UserIdentificationRequest) -> UserIdentificationResponse:
+    glpi_client = _new_glpi_client()
+    response = glpi_client.users(start=0, limit=100)
+
+    if response.get("status_code") != 200:
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível consultar os usuários do GLPI.",
+        )
+
+    domain_service = DomainService()
+    domain_service.update_from_api_response("users", response)
+    result = domain_service.identify_user(request.identifier)
+
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    session_id = request.session_id or str(uuid.uuid4())
+    session_store.save_session(session_id, result["user"])
+    return UserIdentificationResponse(
+        message=result["message"],
+        session_id=session_id,
+        user=IdentifiedUserData(**result["user"]),
+    )
 
 
 def main() -> None:

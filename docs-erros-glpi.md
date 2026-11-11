@@ -93,4 +93,3 @@ A função `sse\_error\_event()` em `src/errors.py` monta esse evento:
 O `/api/chat` ainda retorna 501 (sem motor de conversa), então a função
 
 está pronta para ser usada quando o streaming for implementado.
-

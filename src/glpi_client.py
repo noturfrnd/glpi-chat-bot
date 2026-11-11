@@ -216,6 +216,47 @@ class GLPIClient:
             params={"start": start, "limit": limit},
         )
 
+    def get_all_users(self, batch_size: int = 100) -> list[Dict[str, Any]]:
+        """Busca usuários no GLPI tratando paginação da API (sucesso para 200 e 206)."""
+        all_users: list[Dict[str, Any]] = []
+        start = 0
+
+        while True:
+            response = self.users(start=start, limit=batch_size)
+            status = response.get("status_code", 500)
+
+            if not 200 <= status < 300:
+                if start == 0:
+                    raise requests.HTTPError(
+                        f"GLPI retornou status HTTP {status}: {response.get('data')}"
+                    )
+                break
+
+            data = response.get("data")
+            if not isinstance(data, list):
+                if isinstance(data, dict):
+                    all_users.append(data)
+                break
+
+            all_users.extend(data)
+
+            if len(data) < batch_size or status == 200:
+                break
+
+            start += batch_size
+
+        return all_users
+
+    def approve_ticket(self, validation_id: int, comment: str = "") -> Dict[str, Any]:
+        return self.request(
+            "PATCH",
+            f"/api.php/v2/TicketValidation/{validation_id}",
+            json_body={
+                "status": 3,
+                "comment_submission": comment,
+            },
+        )
+
     def create_ticket(self, name: str, content: str) -> Dict[str, Any]:
         return self.request(
             "POST",
