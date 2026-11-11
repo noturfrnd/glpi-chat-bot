@@ -1,6 +1,7 @@
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, AsyncIterator
 
 import requests
 import uvicorn
@@ -22,10 +23,25 @@ from src.config.pydantic import (
 from src.config.pydantic.jwt import decode_glpi_jwt
 from src.config.pydantic.chat import ChatResponse
 from src.config.pydantic.request import PydanticRequestValidationMiddleware
+from src.chat_memory import chat_history_engine
+from src.crud import import_cache
+from src.database import engine, init_db
 from src.glpi_client import GLPIClient
 from src.knowledge_service import ArticlesFetchError, processar_pergunta
 
-app = FastAPI(title="GLPI Chat Bot API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    try:
+        await init_db()
+        await import_cache()
+        yield
+    finally:
+        chat_history_engine.dispose()
+        await engine.dispose()
+
+
+app = FastAPI(title="GLPI Chat Bot API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(PydanticRequestValidationMiddleware)
 bearer_scheme = HTTPBearer(auto_error=False)
 
