@@ -271,6 +271,13 @@ def update_ticket(
     return _call_glpi(context, "update_ticket", ticket_id, **fields)
 
 
+@app.post("/api/tickets/{ticket_id}/approve")
+@app.post("/api/v1/tickets/{ticket_id}/approve")
+def approve_ticket(ticket_id: int, context: GLPIAuthContext = Depends(get_glpi_auth_context)) -> Response:
+    _validate_ticket_id(ticket_id)
+    return _call_glpi(context, "approve_ticket", ticket_id)
+
+
 @app.get("/api/articles")
 def list_articles(
     pagination: PaginationParams = Depends(),

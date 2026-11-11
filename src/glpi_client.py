@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+TICKET_CLOSED_STATUS = 6
+
 
 class GLPIClient:
     """Cliente base para a API v2 do GLPI."""
@@ -234,6 +236,9 @@ class GLPIClient:
             f"/api.php/v2/Assistance/Ticket/{ticket_id}",
             json_body=fields,
         )
+
+    def approve_ticket(self, ticket_id: int) -> Dict[str, Any]:
+        return self.update_ticket(ticket_id, status=TICKET_CLOSED_STATUS)
 
 
 def pretty_print(label: str, payload: Dict[str, Any]) -> None:
