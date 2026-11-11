@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -23,11 +24,14 @@ from src.config.pydantic import (
 from src.config.pydantic.jwt import decode_glpi_jwt
 from src.config.pydantic.chat import ChatResponse
 from src.config.pydantic.request import PydanticRequestValidationMiddleware
+from src.errors import GLPIConfigError, erro_glpi_por_status, register_error_handlers
 from src.chat_memory import chat_history_engine
 from src.crud import import_cache
 from src.database import engine, init_db
 from src.glpi_client import GLPIClient
 from src.knowledge_service import ArticlesFetchError, processar_pergunta
+
+logger = logging.getLogger("glpi_chat_bot")
 
 
 @asynccontextmanager
@@ -43,6 +47,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="GLPI Chat Bot API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(PydanticRequestValidationMiddleware)
+register_error_handlers(app)
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -96,8 +101,19 @@ def get_glpi_auth_context(
     return context
 
 
+def _executar_glpi(funcao: Any, *args: Any, **kwargs: Any) -> Any:
+    """Executa uma chamada ao GLPI. Erros de rede são tratados pelos handlers globais."""
+    try:
+        return funcao(*args, **kwargs)
+    except ValueError as exc:
+        logger.error("Configuração do GLPI incompleta ou inválida: %s", exc)
+        raise GLPIConfigError() from exc
+
+
 def _proxy_response(result: dict[str, Any]) -> Response:
     status_code = result["status_code"]
+    if status_code >= 400:
+        raise erro_glpi_por_status(status_code, result.get("data"))
     if status_code == 204:
         return Response(status_code=status_code)
     return JSONResponse(status_code=status_code, content=result.get("data"))
@@ -107,16 +123,15 @@ def _proxy_token_response(client: GLPIClient, payload: Any) -> Response:
     status_code = client.last_status_code
     if status_code is None:
         raise HTTPException(status_code=502, detail="O GLPI não retornou um status HTTP para o token.")
+    if status_code >= 400:
+        raise erro_glpi_por_status(status_code, payload, token=True)
     if status_code == 204:
         return Response(status_code=status_code)
     return JSONResponse(status_code=status_code, content=payload)
 
 
 def _call_glpi(context: GLPIAuthContext, operation: str, *args: Any, **kwargs: Any) -> Response:
-    try:
-        result = getattr(context.client, operation)(*args, **kwargs)
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Não foi possível concluir a chamada ao GLPI.") from exc
+    result = _executar_glpi(getattr(context.client, operation), *args, **kwargs)
     return _proxy_response(result)
 
 
@@ -130,10 +145,7 @@ def issue_token(payload: PasswordTokenRequest) -> Response:
         password=payload.password,
         scope=payload.scope,
     )
-    try:
-        result = client.get_token()
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Não foi possível solicitar um token ao GLPI.") from exc
+    result = _executar_glpi(client.get_token)
     return _proxy_token_response(client, result)
 
 
@@ -146,10 +158,7 @@ def refresh_token(payload: RefreshTokenRequest) -> Response:
         scope=payload.scope,
     )
     client.refresh_token = payload.refresh_token
-    try:
-        result = client.refresh_token_request()
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Não foi possível renovar o token no GLPI.") from exc
+    result = _executar_glpi(client.refresh_token_request)
     return _proxy_token_response(client, result)
 
 
