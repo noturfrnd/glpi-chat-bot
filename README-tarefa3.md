@@ -25,20 +25,36 @@ veja o [registro de validação](VALIDACAO-tarefa3.md).
 
 Nenhum modelo de IA é chamado. `history` é aceito e validado, mas não participa da pesquisa nesta tarefa. A busca usa os dados obtidos na requisição atual, sem cache compartilhado entre usuários. A pontuação não representa uma probabilidade de acerto; sinônimos ou perguntas muito diferentes do texto da base podem não encontrar um artigo existente.
 
+A configuração assíncrona do SQLAlchemy cria `database.db` na raiz do projeto
+quando a aplicação inicia e cria `chat_messages` e as tabelas `cache_*`
+correspondentes aos domínios de `data/glpi_cache.json`. Os registros do cache
+são importados de forma idempotente; tokens e campos de credenciais são
+removidos antes da gravação. `src/crud.py` disponibiliza operações genéricas
+de criação, leitura, listagem, atualização e remoção, sem regras de negócio
+por domínio. O endpoint `/api/chat` ainda não grava nem recupera mensagens
+automaticamente.
+
+`src/chat_memory.py` também disponibiliza `build_session_id(jwt_claims,
+conversation_id)` e `create_chat_memory(session_id)`. O gerenciador usa
+`SQLChatMessageHistory` e `ConversationBufferWindowMemory`, mantendo no contexto
+as últimas dez mensagens e restaurando-as do SQLite para o mesmo `session_id`.
+O JWT GLPI observado contém o usuário em `sub`, mas não contém um ID de
+conversa; por isso, o chamador deve fornecer esse ID separadamente. Para usar
+a memória numa integração futura, carregue com
+`memory.load_memory_variables({})` e persista cada interação com
+`memory.save_context({"input": pergunta}, {"output": resposta})`. A classe
+`ConversationBufferWindowMemory` está depreciada pelo LangChain, mas foi usada
+para atender ao requisito desta implementação básica.
+
 ## Abrir e iniciar o projeto
 
-O ambiente do grupo usa o GLPI local do repositório `glpi-agent-lab`.
-Abra o Docker Desktop e aguarde o serviço iniciar. Em uma janela do PowerShell,
-inicie o laboratório já baixado:
+O backend do GLPI está disponível em `http://146.235.38.123:8080`.
+Configure `GLPI_BASE_URL` com esse endereço. Não é necessário iniciar o
+laboratório local para usar essa API.
 
 ```powershell
-Set-Location -LiteralPath 'C:\Users\55799\Documents\glpi-agent-lab-main\lab'
-docker compose up -d --build
+$env:GLPI_BASE_URL = 'http://146.235.38.123:8080'
 ```
-
-O arquivo `.env` desse laboratório já existe. Quando os contêineres estiverem
-prontos, a tela de login do GLPI deve abrir em `http://localhost:8080`.
-Esse ambiente executa a aplicação GLPI real com dados fictícios de treinamento.
 
 Abra esta pasta no VS Code ou no terminal:
 
@@ -46,11 +62,11 @@ Abra esta pasta no VS Code ou no terminal:
 C:\Users\55799\Documents\Codex\2026-10-20\v\work\glpi-chat-bot
 ```
 
-Em outra janela do PowerShell, entre nela e configure o endereço do laboratório. `GLPI_BASE_URL` aponta para o servidor GLPI na porta 8080; `base_url`, usado no Postman, aponta para esta API local na porta 8000. A porta 8001 pertence à simulação separada.
+Em outra janela do PowerShell, entre nela e configure o endereço do GLPI. `GLPI_BASE_URL` aponta para `http://146.235.38.123:8080`; `base_url`, usado no Postman, aponta para esta API local na porta 8000. A porta 8001 pertence à simulação separada.
 
 ```powershell
 Set-Location -LiteralPath 'C:\Users\55799\Documents\Codex\2026-10-20\v\work\glpi-chat-bot'
-$env:GLPI_BASE_URL = 'http://localhost:8080'
+$env:GLPI_BASE_URL = 'http://146.235.38.123:8080'
 $env:APP_ENV = 'production'
 $env:DEV_BYPASS_API_VALIDATION = 'false'
 & 'C:\Users\55799\Documents\Codex\2026-10-20\v\work\venv-glpi\Scripts\python.exe' -B -m uvicorn src.main:app --host 127.0.0.1 --port 8000
@@ -131,7 +147,7 @@ retornou 401, como esperado pelo teste da collection.
 ## Situação da validação
 
 **A integração com o GLPI do laboratório foi validada em 22/10/2026.**
-O GLPI em `http://localhost:8080` disponibilizou 40 artigos, consultados pelo
+O GLPI do laboratório disponibilizou 40 artigos, consultados pelo
 backend `src.main:app` na porta 8000. Esses testes usaram a aplicação GLPI real
 com os dados fictícios do laboratório.
 

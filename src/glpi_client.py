@@ -19,7 +19,11 @@ class GLPIClient:
         password: Optional[str] = None,
         scope: str = "api",
     ) -> None:
-        self.base_url = (base_url or os.getenv("GLPI_BASE_URL") or "http://localhost:8080").rstrip("/")
+        self.base_url = (
+            base_url
+            or os.getenv("GLPI_BASE_URL")
+            or "http://146.235.38.123:8080"
+        ).rstrip("/")
         self.client_id = client_id or os.getenv("GLPI_CLIENT_ID")
         self.client_secret = client_secret or os.getenv("GLPI_CLIENT_SECRET")
         self.username = username or os.getenv("GLPI_USERNAME")

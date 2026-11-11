@@ -92,9 +92,8 @@ Também realizamos a repetição manual no Postman. A captura da busca natural c
 
 ## Como reproduzir os testes
 
-1. Iniciar o Docker Desktop. Na pasta lab do glpi-agent-lab, executar docker compose up -d --build e confirmar que o GLPI abre em http://localhost:8080.
-
-2. No projeto glpi-chat-bot, preparar o ambiente Python com requirements.txt. Configurar GLPI_BASE_URL=http://localhost:8080, APP_ENV=production e DEV_BYPASS_API_VALIDATION=false.
+1. Confirmar que o backend GLPI está acessível em http://146.235.38.123:8080.
+2. No projeto glpi-chat-bot, preparar o ambiente Python com requirements.txt. Configurar GLPI_BASE_URL=http://146.235.38.123:8080, APP_ENV=production e DEV_BYPASS_API_VALIDATION=false.
 
 3. Iniciar a API com python -m uvicorn src.main:app --host 127.0.0.1 --port 8000 e manter o terminal aberto durante os testes.
 

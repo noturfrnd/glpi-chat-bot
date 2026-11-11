@@ -1,6 +1,6 @@
 # API do GLPI 11 (v2) — o que você precisa saber
 
-Base: `http://localhost:8080/api.php`
+Base: `http://146.235.38.123:8080/api.php`
 
 Tudo abaixo foi confirmado ao vivo contra o lab local (GLPI 11.0.8), rodando
 `docker compose up -d` na pasta `lab/`. Nada aqui é presumido.
