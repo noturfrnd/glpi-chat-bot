@@ -130,7 +130,10 @@ class PydanticRequestValidationMiddleware:
         async def replay_body() -> dict[str, Any]:
             nonlocal body_sent
             if body_sent:
-                return {"type": "http.request", "body": b"", "more_body": False}
+                # Depois do corpo, delega ao receive original: ele só responde quando o
+                # cliente desconecta. Devolver mensagens vazias aqui trava o StreamingResponse,
+                # que fica lendo receive() em loop para detectar queda de conexão.
+                return await receive()
             body_sent = True
             return {"type": "http.request", "body": bytes(body), "more_body": False}
 

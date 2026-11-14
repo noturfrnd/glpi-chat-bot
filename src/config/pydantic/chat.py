@@ -79,3 +79,32 @@ class ChatRequest(APIInputModel):
         ):
             raise ValueError(f"O histórico não pode conter mais de {MAX_HISTORY_MESSAGES} mensagens.")
         return value
+
+
+class ChatStreamRequest(APIInputModel):
+    """Entrada de POST /api/v1/chat. O usuário vem do JWT, a conversa vem do corpo."""
+
+    message: str = Field(json_schema_extra={"minLength": 1, "maxLength": MAX_MESSAGE_LENGTH})
+    conversation_id: str = Field(json_schema_extra={"minLength": 1, "maxLength": 128})
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, value: str) -> str:
+        if cls.should_bypass_validation():
+            return value
+        if not value.strip():
+            raise ValueError("A mensagem não pode ser vazia.")
+        if len(value) > MAX_MESSAGE_LENGTH:
+            raise ValueError(f"A mensagem não pode exceder {MAX_MESSAGE_LENGTH} caracteres.")
+        return value
+
+    @field_validator("conversation_id")
+    @classmethod
+    def validate_conversation_id(cls, value: str) -> str:
+        if cls.should_bypass_validation():
+            return value
+        if not value.strip():
+            raise ValueError("O ID da conversa não pode ser vazio.")
+        if len(value) > 128:
+            raise ValueError("O ID da conversa não pode exceder 128 caracteres.")
+        return value.strip()

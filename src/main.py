@@ -9,8 +9,9 @@ import requests
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from langchain_core.runnables import Runnable
 
 from src.config.pydantic import (
     ChatRequest,
@@ -26,10 +27,11 @@ from src.config.pydantic import (
     validation_bypassed,
 )
 from src.config.pydantic.jwt import decode_glpi_jwt
-from src.config.pydantic.chat import ChatResponse
+from src.config.pydantic.chat import ChatResponse, ChatStreamRequest
 from src.config.pydantic.request import PydanticRequestValidationMiddleware
 from src.errors import GLPIConfigError, GLPIError, erro_glpi_por_status, register_error_handlers
-from src.chat_memory import chat_history_engine
+from src.chat_memory import build_session_id, chat_history_engine
+from src.chat_stream import get_chat_runnable, stream_chat_events
 from src.crud import import_cache
 from src.database import engine, init_db
 from src.domain_service import DomainService
@@ -318,6 +320,27 @@ def list_users(
     context: GLPIAuthContext = Depends(get_glpi_auth_context),
 ) -> Response:
     return _call_glpi(context, "users", start=pagination.start, limit=pagination.limit)
+
+
+@app.post("/api/v1/chat")
+async def chat_stream(
+    payload: ChatStreamRequest,
+    context: GLPIAuthContext = Depends(get_glpi_auth_context),
+    runnable: Runnable = Depends(get_chat_runnable),
+) -> StreamingResponse:
+    try:
+        session_id = build_session_id(context.jwt_claims, payload.conversation_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="O token precisa identificar o usuário (claim 'sub').",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    return StreamingResponse(
+        stream_chat_events(runnable, payload.message, session_id, payload.conversation_id),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/chat", response_model=ChatResponse)
