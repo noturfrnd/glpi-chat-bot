@@ -73,5 +73,48 @@ class KeywordSearchTests(unittest.TestCase):
                 self.assertEqual(self.busca.pesquisar(question), [])
 
 
+class ConjugatedVerbTests(unittest.TestCase):
+    """Perguntas reais usam verbos conjugados; os títulos dos artigos usam o infinitivo."""
+
+    def setUp(self):
+        self.busca = Busca([
+            {'id': 1, 'name': 'Configurar a VPN corporativa no Windows', 'content': 'Instale o cliente VPN.'},
+            {'id': 3, 'name': 'Redefinir a senha de rede pelo autoatendimento', 'content': 'Acesse o portal.'},
+            {'id': 5, 'name': 'Instalar impressora de rede no Windows', 'content': 'Adicione a impressora.'},
+            {'id': 22, 'name': 'Configurar assinatura padrão de e-mail', 'content': 'Abra o Outlook.'},
+            {'id': 39, 'name': 'Mouse ou teclado com defeito', 'content': 'Troque as pilhas.'},
+        ])
+
+    def ids(self, pergunta):
+        return [item['id'] for item in self.busca.pesquisar(pergunta)]
+
+    def test_conjugations_match_infinitive_titles(self):
+        for pergunta, esperado in (
+            ('Como configuro a VPN?', [1]),
+            ('Configurei a VPN no Windows', [1]),
+            ('Como reseto minha senha?', [3]),
+            ('Como resetar minha senha?', [3]),
+            ('Como redefino minha senha?', [3]),
+            ('Como instalo a impressora de rede?', [5]),
+        ):
+            with self.subTest(pergunta=pergunta):
+                self.assertEqual(self.ids(pergunta), esperado)
+
+    def test_change_verbs_do_not_hide_the_subject(self):
+        for pergunta in ('Quero alterar minha senha', 'Como mudo minha senha?', 'Como troco minha senha?'):
+            with self.subTest(pergunta=pergunta):
+                self.assertEqual(self.ids(pergunta), [3])
+
+    def test_keywords_use_canonical_verb(self):
+        self.assertEqual(extrair_palavras_chave('Como reseto minha senha?'), ['redefinir', 'senha'])
+        self.assertEqual(extrair_palavras_chave('Configurei a VPN mas não conecta'),
+                         ['configurar', 'vpn', 'conectar'])
+
+    def test_generic_verbs_alone_still_return_nothing(self):
+        for pergunta in ('Como configuro?', 'Quero trocar', 'Como configuro o telescópio?'):
+            with self.subTest(pergunta=pergunta):
+                self.assertEqual(self.ids(pergunta), [])
+
+
 if __name__ == '__main__':
     unittest.main()

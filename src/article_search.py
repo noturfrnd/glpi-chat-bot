@@ -35,11 +35,27 @@ def texto_html(html):
     return '\n'.join(' '.join(linha.split()) for linha in ''.join(parser.partes).splitlines() if linha.strip())
 
 
-STOP = set('a o as os de da do das dos e em no na nos nas um uma para por com que como qual quais eu meu minha meus minhas se ao aos pelo pela preciso quero fazer esta estou nao'.split())
+STOP = set('a o as os de da do das dos e em no na nos nas um uma para por com que como qual quais eu meu minha meus minhas se ao aos pelo pela preciso quero fazer esta estou nao mas'.split())
 # Verbos genéricos e plataforma ajudam a ordenar, mas não definem o assunto.
-GENERICOS = set('configurar instalar acessar usar funciona funcionar windows macos favor ajuda gostaria saber posso pode consigo'.split())
+GENERICOS = set('configurar instalar acessar usar funciona funcionar windows macos favor ajuda gostaria saber posso pode consigo trocar alterar mudar'.split())
 SINONIMOS = {'lenta': 'lentidao', 'lento': 'lentidao', 'lentissima': 'lentidao',
              'lentissimo': 'lentidao', 'mac': 'macos', 'wi': 'wifi'}
+# Radicais de verbos frequentes nas perguntas -> forma usada nos títulos dos artigos.
+# "Como configuro a VPN?" precisa casar com "Configurar a VPN"; "resetar" com "Redefinir".
+VERBOS = {'configur': 'configurar', 'instal': 'instalar', 'reinstal': 'reinstalar',
+          'reset': 'redefinir', 'redefin': 'redefinir', 'troc': 'trocar', 'alter': 'alterar',
+          'mud': 'mudar', 'conect': 'conectar', 'substitu': 'substituir'}
+# Terminações de conjugação (presente, pretérito, infinitivo, imperativo, gerúndio, particípio).
+# Substantivos como "instalacao" e "conexao" não terminam assim e continuam intactos.
+TERMINACOES = frozenset('o a as am amos ar ei ou e em ando ado ada ados adas i iu ir imos indo ido ida'.split())
+
+
+def _canonico(termo):
+    termo = SINONIMOS.get(termo, termo)
+    for radical, infinitivo in VERBOS.items():
+        if termo.startswith(radical) and termo[len(radical):] in TERMINACOES:
+            return infinitivo
+    return termo
 MAX_PERGUNTA = 4000
 CONVERSACIONAIS = {
     'oi', 'ola', 'obrigado', 'obrigada', 'tentando', 'tentar',
@@ -51,7 +67,7 @@ def tokens(texto):
     texto = ''.join(c for c in unicodedata.normalize('NFKD', texto.lower()) if not unicodedata.combining(c))
     texto = re.sub(r'\bwi[\s-]+fi\b', 'wifi', texto)
     texto = re.sub(r'\be[\s-]+mail\b', 'email', texto)
-    return [SINONIMOS.get(t, t) for t in re.findall(r'[a-z0-9]+', texto) if t not in STOP and len(t) > 1]
+    return [_canonico(t) for t in re.findall(r'[a-z0-9]+', texto) if t not in STOP and len(t) > 1]
 
 
 def extrair_palavras_chave(pergunta: str) -> list[str]:
